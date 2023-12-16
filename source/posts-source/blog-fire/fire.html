@@ -1,299 +1,464 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Simulating Fluids, Fire, and Smoke</title>
-  <script src="https://distill.pub/template.v1.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="./fire-assets/fire.css">
+<toyb-post>
+  <toyb-title>Simulating Fluids, Fire, and Smoke</toyb-title>
+  <toyb-date>Dec 14 2023</toyb-date>
+  <toyb-head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="./fire-assets/fire.css">
 
 
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
 
-    gtag('config', 'G-HYB0C59DXR');
-  </script>
+      gtag('config', 'G-HYB0C59DXR');
+    </script>
 
-  <script type="text/front-matter">
-    title: "Simulating Fluids, Fire, and Smoke in Real-Time"
-    description: "Notes on the math, algorithms, and methods involved in simulating fluids like fire and smoke in real-time."
-    authors:
-    - Andrew Chan: http://andrewkchan.github.io
-    affiliations:
-    -
-  </script>
-</head>
-<body>
-<dt-article>
-  <h1>Simulating Fluids, Fire, and Smoke in Real-Time</h1>
-  <h2>Notes on the math, algorithms, and methods involved in simulating fluids like fire and smoke in real-time.</h2>
-  <dt-byline></dt-byline>
-  <p>
-    Fire is an interesting graphics problem. Past approaches generally faked it. For example,
-    <i>Lord of the Rings</i> <dt-cite key="Aitken:2004:LRV:1103900.1103911"></dt-cite> used sprites with lots and lots of smoke
-    (the fluid sim was too expensive at the time, even for movies).
-    Real-time applications like video games have pretty much exclusively
-    used non-physical approaches.
-  </p>
-  <iframe width="560" height="400" src="https://www.youtube.com/embed/OieygwngQ6E?si=9kSBKO0WiDgVV0Oe" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen class="l-middle"></iframe>
-  <p>
-    But in the last 10 years GPUs have made fast fluid simulation easy.
-    Basic fluid dynamics algorithms are straightforward to implement on the GPU <dt-cite key="harris2005fast"></dt-cite>. In 2009, ILM used these techniques to model and render fire in
-    <i>Harry Potter</i> <dt-cite key="horvath2009directable"></dt-cite>.
-    And in 2014, NVIDIA released FlameWorks, a whole system for generating fire and smoke effects for games.
-  </p>
-  <p>
-    This post takes notes on how fire can be simulated on the GPU. It walks through the math behind fluid dynamics,
-    parallel algorithms for modeling fluids, and the extra combustion bits that make fire special. Readers should have a reasonable
-    background in vector calculus and differential equations (know how to take the gradient of a vector). Demos are implemented with WebGL.
-  </p>
-  <dt-byline></dt-byline>
-  <h2>1. Fluid Simulation</h2>
-  <p>
-    Before we simulate fire, we need to simulate fluid. We assume
-    our fluid is <a href="https://en.wikipedia.org/wiki/Incompressible_flow">incompressible</a> and
-    <a href="https://en.wikipedia.org/wiki/Inviscid_flow">inviscid</a>, which will vastly simplify our problem.
-  </p>
-  <h3>1.1 Basic Fluid Dynamics</h3>
-  <p>
-    Suppose \(D\) is a region in space filled with a fluid. At any point \( \mathbf{x} \in D \) and time \(t\), the fluid has velocity \(\mathbf{u}(\mathbf{x}, t)\).
-    Computationally, we can represent the 2D velocity field \( \mathbf{u} \) with an \( N \times N \) grid, where the equally spaced grid points give the value of
-    the velocity field at that point in space.
-  </p>
-  <div class="demo">
-    <svg id="demo-grid" width="500" height="500"></svg>
-  </div>
-  <p>
-    <em>Ex: A 16\(\times\)16 grid representing \( \mathbf{u} = (y, -x) \)</em>
-  </p>
-  <p>
-    What will happen if we put a drop of dye in the fluid?
-  </p>
-  <p>
-    Let's define a scalar field \( \psi (\mathbf{x}, t) \) as the density of the dye at any point in space and time.
-    The transport of quantities like \( \psi \) within a fluid by the fluid's velocity is called <b>advection</b>.
-    Given some fluid's velocity field and an initial density field of our dye, we'd like to see how the dye's density everywhere
-    evolves over time by simulating its advection through the fluid.
-  </p>
-  <p><b>A Naive Method for Advection</b></p>
-  <p>
-    One idea <dt-fn>As seen below, our scalar field can be expressed as a differential equation. This idea is using Euler's method to solve it.</dt-fn> to compute
-    the advection is to take each grid point, move forward the direction and distance that would be traveled
-    by a particle at the grid point's velocity and the simulation timestep \( \Delta t \), and update the grid point nearest to where the particle lands:
-
-    $$
-    \psi (\mathbf{x} + \mathbf{u} (\mathbf{x}, t), t + \Delta t) = \psi (\mathbf{x}, t)
-    $$
-  </p>
-  <p>
-    But this is tricky to parallelize, since 2 grid points can end up in the same target point after forward evaluation.
-    And in practice, the target point will fall between grid points, meaning it has to be interpolated into the surrounding grid points. Finally, this process is
-    unstable for time steps above some number, causing  \( \psi \) to blow up.
-  </p>
-  <p><b>The Advection Partial Differential Equations</b></p>
-  <p>
-    This whole time we've been solving a partial differential equation! If we're going to derive a stable method for advection, we'll need to
-    first get an explicit expression for this PDE. Let's start from first principles.
-  </p>
-  <p>
-    Consider a fixed region of space \(W\) (that is, \(W\) does not vary with time). The total mass of dye within \(W\)
-    is \( \int_{W} \psi dV\). Over time, the change in mass is:
-
-    $$
-    \frac{d}{dt} \int_{W} \psi (\mathbf{x}, t) dV = \int_{W} \frac{\partial}{\partial t} \psi (\mathbf{x}, t) dV \\
-    $$
-
-    Now, letting \(S\) denote the surface of \(W\) and \( \mathbf{n} \) the outward normal vector defined along the surface, we can examine
-    the mass flow rate through the surface of \(W\). In particular, observe that the volume flow rate - the <i>volume</i> of fluid that
-    flows through per second </i> - across \(S\) per unit area is \( \mathbf{u} \cdot \mathbf{n} \) and the mass flow rate per unit area
-    is \( \psi \mathbf{u} \cdot \mathbf{n} \).
-  </p>
-  <div>
-    <svg width="586" height="486" viewBox="0 0 586 486" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M175.754 267.823C89.7543 197.823 38.1959 116.823 170.975 101.323C303.754 85.8234 434.975 210.323 507.754 273.823C580.533 337.323 499.754 383.823 435.754 383.823C371.754 383.823 270.754 336.823 175.754 267.823Z" stroke="black" stroke-width="2" stroke-dasharray="12 12"/>
-      <path d="M317 132.5L386 174.071" stroke="#C90BC2" stroke-width="6"/>
-      <path d="M396 88L380.516 95.7626L394.981 105.29L396 88ZM353.253 155.622L389.826 100.099L387.321 98.4488L350.747 153.972L353.253 155.622Z" fill="#C90BC2"/>
-      <path d="M141.261 72.5927L130.012 75.5556L138.247 83.6504L141.261 72.5927ZM67.9195 146.091L135.556 79.603L134.129 78.201L66.4932 144.689L67.9195 146.091Z" fill="black"/>
-      <path d="M90.0543 211.104L78.8056 214.067L87.0402 222.162L90.0543 211.104ZM16.7131 284.602L84.3492 218.115L82.9229 216.713L15.2869 283.2L16.7131 284.602Z" fill="black"/>
-      <path d="M239.734 146.162L228.486 149.125L236.72 157.22L239.734 146.162ZM166.393 219.66L234.029 153.172L232.603 151.77L164.967 218.258L166.393 219.66Z" fill="black"/>
-      <path d="M432.054 82L420.806 84.9629L429.04 93.0576L432.054 82ZM358.713 155.498L426.349 89.0102L424.923 87.6082L357.287 154.096L358.713 155.498Z" fill="black"/>
-      <path d="M346.086 219.731L334.837 222.694L343.072 230.789L346.086 219.731ZM272.745 293.229L340.381 226.742L338.955 225.34L271.318 291.827L272.745 293.229Z" fill="black"/>
-      <path d="M444.56 283.62L433.311 286.583L441.546 294.678L444.56 283.62ZM371.218 357.118L438.854 290.631L437.428 289.229L369.792 355.716L371.218 357.118Z" fill="black"/>
-      <path d="M193.008 299.881L181.759 302.844L189.994 310.939L193.008 299.881ZM119.667 373.379L187.303 306.891L185.876 305.489L118.24 371.977L119.667 373.379Z" fill="black"/>
-      <path d="M308.054 372L296.806 374.963L305.04 383.058L308.054 372ZM234.713 445.498L302.349 379.01L300.923 377.608L233.287 444.096L234.713 445.498Z" fill="black"/>
-      <path d="M550.054 146L538.806 148.963L547.04 157.058L550.054 146ZM476.713 219.498L544.349 153.01L542.923 151.608L475.287 218.096L476.713 219.498Z" fill="black"/>
-      <path d="M284.054 20L272.806 22.9629L281.04 31.0576L284.054 20ZM210.713 93.4979L278.349 27.0103L276.923 25.6082L209.287 92.0959L210.713 93.4979Z" fill="black"/>
-      <path d="M371.616 85.1876C371.616 81.7652 370.139 80 366.176 80C363.583 80 361.349 81.2609 360.124 83.9627H360.088V80L354 80.2882V81.8373C356.234 81.8373 356.486 81.8373 356.486 83.2422V94.6621H354V96.2112C354.829 96.1392 357.422 96.1392 358.431 96.1392C359.44 96.1392 362.07 96.1392 362.898 96.2112V94.6621H360.412V86.9888C360.412 83.0981 363.294 81.1888 365.6 81.1888C366.933 81.1888 367.689 82.0534 367.689 84.7913V94.6621H365.204V96.2112C366.032 96.1392 368.626 96.1392 369.635 96.1392C370.644 96.1392 373.273 96.1392 374.102 96.2112V94.6621H371.616V85.1876Z" fill="#C90BC2"/>
-      <path d="M455.204 74.2882V75.8373C457.437 75.8373 457.689 75.8373 457.689 77.2422V84.3031C457.689 87.041 456.068 89.2385 453.258 89.2385C450.557 89.2385 450.412 88.3379 450.412 86.3565V74L444 74.2882V75.8373C446.234 75.8373 446.486 75.8373 446.486 77.2422V85.7801C446.486 89.3826 448.899 90.4274 452.754 90.4274C453.619 90.4274 456.284 90.4274 457.834 87.5093H457.87V90.4274L464.102 90.2112V88.6621C461.868 88.6621 461.616 88.6621 461.616 87.2572V74L455.204 74.2882Z" fill="black"/>
-      <path d="M524.295 397.307C525.602 395.091 526.852 392.989 530.261 392.648C530.773 392.591 531.284 392.534 531.284 391.625C531.284 391 530.773 391 530.602 391C530.489 391 530.091 391.114 526.341 391.114C524.636 391.114 522.875 391 521.227 391C520.886 391 520.205 391 520.205 392.08C520.205 392.591 520.659 392.648 521 392.648C522.136 392.705 523.955 393.045 523.955 394.807C523.955 395.545 523.727 395.943 523.159 396.909L507.648 424.068L505.602 394.466C505.602 393.784 506.227 392.705 509.409 392.648C510.148 392.648 510.716 392.648 510.716 391.568C510.716 391 510.148 391 509.864 391C507.875 391 505.773 391.114 503.727 391.114H500.773C499.92 391.114 498.898 391 498.045 391C497.705 391 497.023 391 497.023 392.08C497.023 392.648 497.42 392.648 498.386 392.648C501 392.648 501 392.705 501.227 396.17L501.398 398.216L486.682 424.068L484.58 394.75C484.58 394.125 484.58 392.705 488.443 392.648C489.068 392.648 489.693 392.648 489.693 391.625C489.693 391 489.182 391 488.841 391C486.852 391 484.75 391.114 482.705 391.114H479.75C478.898 391.114 477.875 391 477.023 391C476.682 391 476 391 476 392.08C476 392.648 476.455 392.648 477.25 392.648C479.92 392.648 479.977 392.989 480.091 394.807L482.591 429.693C482.648 430.659 482.705 431 483.386 431C483.955 431 484.068 430.773 484.58 429.92L501.511 400.318L503.614 429.693C503.67 430.659 503.727 431 504.409 431C504.977 431 505.148 430.716 505.602 429.92L524.295 397.307Z" fill="black"/>
-    </svg>
-  </div>
-  <p>
-    This gives us the <b>law of conservation of mass</b> in integral form:
-
-    $$
-    \frac{d}{dt} \int_{W} \psi dV = - \int_{S} \psi \mathbf{u} \cdot \mathbf{n} dA
-    $$
-
-    Can we get rid of the integrals and say something similar for points? By divergence theorem, the above is equivalent to
-
-    $$
-    \int_{W} [\frac{\partial \psi}{\partial t} + \nabla \cdot (\psi \mathbf{u})] dV = 0
-    $$
-
-    Then for a unit subregion \( W = dV \), we can say that
-
-    $$
-    \frac{\partial \psi}{\partial t} + \nabla \cdot (\psi \mathbf{u}) = 0
-    $$
-
-    This gives us an explicit PDE that we need to solve for \( \psi \)!
-  </p>
-  <p>
-    Hmm... we could stop here, but we might be able to simplify this more. Specifically, it looks like we could isolate out
-    a term \( \nabla \cdot \mathbf{u} \) that goes to zero because of incompressibility.
-
-    $$
-    \begin{aligned}
-    &\frac{\partial \psi}{\partial t} = - \nabla \cdot (\psi \mathbf{u}) \\
-    &= - (\frac{\partial}{\partial x} \psi u + \frac{\partial}{\partial y} \psi v) \\
-    &= - (\frac{\partial \psi}{\partial x} u + \frac{\partial u}{\partial x} \psi +  \frac{\partial \psi}{\partial y} v + \frac{\partial v}{\partial y} \psi) \\
-    &= - (\psi \nabla \cdot \mathbf{u} + \mathbf{u} \cdot \nabla \psi) \\
-    &= - \mathbf{u} \cdot \nabla \psi \\
-    \end{aligned}
-    $$
-
-    Applying our incompressibility constraint \( \nabla \cdot \mathbf{u} = 0 \) at the end yields a scalar PDE, the first of our <b>incompressible flow advection equations</b>:
-
-    $$
-    \frac{\partial \psi}{\partial t} = \text{advection} (\mathbf{u}, \psi) = - \mathbf{u} \cdot \nabla \psi \tag{1}
-    $$
-    $$
-    \frac{\partial \mathbf{v}}{\partial t} = \text{advection} (\mathbf{u}, \mathbf{v}) = - \mathbf{u} \cdot \nabla \mathbf{v} \tag{2}
-    $$
-
-    Eq. 2 for advecting a vector field \( \mathbf{v} \) through our velocity field can be derived similarly to the scalar advection equation.
-  </p>
-  <p><b>A Stable Method for Advection</b></p>
-  <p>
-    Let's look closely at eqn. (1):
-    $$
-    \frac{\partial \psi}{\partial t} = - \mathbf{u} \cdot \nabla \psi
-    $$
-  </p>
-  <p>
-    Notice that the right-hand term is a directional derivative in the \( -\mathbf{u} \) direction. This gives us a wonderful new method for
-    advecting \( \psi \) by an incompressible fluid - starting at a grid point \( \mathbf{x} \), trace the fluid velocity <i>backwards</i>,
-    replacing the value at our original point by the value that we land on (if we land between points, we can interpolate):
-
-    $$
-    \psi (\mathbf{x}, t + \Delta t) = \psi (\mathbf{x} - \mathbf{u} (\mathbf{x}, t), t)
-    $$
-
-    In GPU pseudocode:
-  </p>
-  <!-- <dt-code block language="glsl"> -->
-    <pre class="l-middle">
-      <code class="language-glsl">
-        global Vec2Field u;
-        global FloatField density;
-        global float dt;
-
-        // Run for each point in our scalar grid that we want to update
-        float advectPoint(vec2 x) {
-          vec2 coord = x - dt * getVec2At(u, x);
-          return getFloatAt(density, coord);
-        }
-      </code>
-    </pre>
-  <!-- </dt-code> -->
-  <p>
-    This method is called
-    <b>Semi-Lagrangian advection</b> and was invented in 1999 by Jos Stam <dt-cite key="stam1999stable"></dt-cite>.
-    Like Euler, it's first-order accurate, but has exactly the additional properties we need:
-  </p>
-  <ol>
-    <li>
-      It's extremely easy to parallelize because each grid point only gets updated once per iteration.
-    </li>
-    <li>
-      It's <i>unconditionally stable</i>. Why? Observe that for any grid point, the maximum value it can get updated to is the maximum value
-      of all the grid points.
-    </li>
-  </ol>
-  <p>
-    For a fixed velocity field fulfilling the incompressibility constraint, it works great.
-  </p>
-  <div class="l-middle demo">
-    <div class="demo-canvas-cover">
-      <div class="demo-canvas-cover-button">
-        Click and hold
-      </div>
+    <script type="text/front-matter">
+      title: "Simulating Fluids, Fire, and Smoke in Real-Time"
+      description: "Notes on the math, algorithms, and methods involved in simulating fluids like fire and smoke in real-time."
+      authors:
+      - Andrew Chan: http://andrewkchan.github.io
+      affiliations:
+      -
+    </script>
+  </toyb-head>
+  <dt-article>
+    <h1>Simulating Fluids, Fire, and Smoke in Real-Time</h1>
+    <h2>Notes on the math, algorithms, and methods involved in simulating fluids like fire and smoke in real-time.</h2>
+    <dt-byline></dt-byline>
+    <hr>
+    <p>
+      <em>Source code for this article can be found on <a href="https://github.com/andrewkchan/andrewkchan.github.io/tree/main/source/posts-source/blog-fire">my GitHub</a>.</em>
+    </p>
+    <hr>
+    <p>
+      Fire is an interesting graphics problem. Past approaches generally faked it. For example,
+      <i>Lord of the Rings</i> <dt-cite key="Aitken:2004:LRV:1103900.1103911"></dt-cite> used sprites with lots and lots of smoke
+      (the fluid sim was too expensive at the time, even for movies).
+      Real-time applications like video games have pretty much exclusively
+      used non-physical approaches.
+    </p>
+    <iframe width="560" height="400" src="https://www.youtube.com/embed/OieygwngQ6E?si=9kSBKO0WiDgVV0Oe" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen class="l-middle"></iframe>
+    <p>
+      But in the last 10 years GPUs have made fast fluid simulation easy.
+      Basic fluid dynamics algorithms are straightforward to implement on the GPU <dt-cite key="harris2005fast"></dt-cite>. In 2009, ILM used these techniques to model and render fire in
+      <i>Harry Potter</i> <dt-cite key="horvath2009directable"></dt-cite>.
+      And in 2014, NVIDIA released FlameWorks, a whole system for generating fire and smoke effects for games.
+    </p>
+    <p>
+      This post takes notes on how fire can be simulated on the GPU. It walks through the math behind fluid dynamics,
+      parallel algorithms for modeling fluids, and the extra combustion bits that make fire special. Readers should have a reasonable
+      background in vector calculus and differential equations (know how to take the gradient of a vector). Demos are implemented with WebGL.
+    </p>
+    <dt-byline></dt-byline>
+    <h2>1. Fluid Simulation</h2>
+    <p>
+      Before we simulate fire, we need to simulate fluid. We assume
+      our fluid is <a href="https://en.wikipedia.org/wiki/Incompressible_flow">incompressible</a> and
+      <a href="https://en.wikipedia.org/wiki/Inviscid_flow">inviscid</a>, which will vastly simplify our problem.
+    </p>
+    <h3>1.1 Basic Fluid Dynamics</h3>
+    <p>
+      Suppose \(D\) is a region in space filled with a fluid. At any point \( \mathbf{x} \in D \) and time \(t\), the fluid has velocity \(\mathbf{u}(\mathbf{x}, t)\).
+      Computationally, we can represent the 2D velocity field \( \mathbf{u} \) with an \( N \times N \) grid, where the equally spaced grid points give the value of
+      the velocity field at that point in space.
+    </p>
+    <div class="demo">
+      <svg id="demo-grid" width="500" height="500"></svg>
     </div>
-    <canvas class="demo-canvas" id="velocity-canvas"></canvas>
-  </div>
-  <p>
-    <em>Click anywhere above to drop some dye in the flow</em>
-  </p>
-  <dt-byline></dt-byline>
-  <h3>1.2 The Navier-Stokes Equations</h3>
-  <p>
-    So far we've found a model that describes how scalar properties of a fluid evolve over time, assuming the flow is fixed. What about the fluid flow itself -
-    how does the velocity field \( \mathbf{u} \) affect itself over time?
-  </p>
-  <p>
-    The <b>Navier-Stokes equations</b>
-    <dt-fn>For a detailed derivation, see Chapter 1.3 of Chorin and Marsden (1993).</dt-fn>
-    <dt-fn>
-      Famous for the <a href="https://en.wikipedia.org/wiki/Navier%E2%80%93Stokes_existence_and_smoothness">Navier-Stokes existence
-      and smoothness</a> problem, one of the Clay Institute's seven Millenium Prize problems in math.
-    </dt-fn>
-    for incompressible flow define how the velocity at any point in a fluid evolves over time:
+    <p>
+      <em>Ex: A 16\(\times\)16 grid representing \( \mathbf{u} = (y, -x) \)</em>
+    </p>
+    <p>
+      What will happen if we put a drop of dye in the fluid?
+    </p>
+    <p>
+      Let's define a scalar field \( \psi (\mathbf{x}, t) \) as the density of the dye at any point in space and time.
+      The transport of quantities like \( \psi \) within a fluid by the fluid's velocity is called <b>advection</b>.
+      Given some fluid's velocity field and an initial density field of our dye, we'd like to see how the dye's density everywhere
+      evolves over time by simulating its advection through the fluid.
+    </p>
+    <p><b>A Naive Method for Advection</b></p>
+    <p>
+      One idea <dt-fn>As seen below, our scalar field can be expressed as a differential equation. This idea is using Euler's method to solve it.</dt-fn> to compute
+      the advection is to take each grid point, move forward the direction and distance that would be traveled
+      by a particle at the grid point's velocity and the simulation timestep \( \Delta t \), and update the grid point nearest to where the particle lands:
 
-    $$
-    \frac{\partial \mathbf{u}}{\partial t} =
-    {\underbrace{ - \mathbf{u} \cdot \nabla \mathbf{u} }_\text{self-advection}} +
-    {\underbrace{ \mu^2 \nabla \mathbf{u} }_\text{diffusion}} -
-    {\underbrace{ \nabla p }_\text{pressure}} +
-    {\underbrace{ \textbf{F} }_\text{ext. forces}}
-    $$
-    $$
-    \text{where~}\forall t{~,~} \nabla \cdot \mathbf{u} = 0
-    $$
+      $$
+      \psi (\mathbf{x} + \mathbf{u} (\mathbf{x}, t), t + \Delta t) = \psi (\mathbf{x}, t)
+      $$
+    </p>
+    <p>
+      But this is tricky to parallelize, since 2 grid points can end up in the same target point after forward evaluation.
+      And in practice, the target point will fall between grid points, meaning it has to be interpolated into the surrounding grid points. Finally, this process is
+      unstable for time steps above some number, causing  \( \psi \) to blow up.
+    </p>
+    <p><b>The Advection Partial Differential Equations</b></p>
+    <p>
+      This whole time we've been solving a partial differential equation! If we're going to derive a stable method for advection, we'll need to
+      first get an explicit expression for this PDE. Let's start from first principles.
+    </p>
+    <p>
+      Consider a fixed region of space \(W\) (that is, \(W\) does not vary with time). The total mass of dye within \(W\)
+      is \( \int_{W} \psi dV\). Over time, the change in mass is:
 
-    Here, the constant \( \mu \) is the fluid's viscosity and \( \mathbf{F} \) are
-    external forces. But we assumed earlier that our fluid was <a href="https://en.wikipedia.org/wiki/Inviscid_flow">inviscid</a>,
-    so \( \mu = 0 \), and we can just ignore external forces for now. So we're left with two terms - self-advection and pressure.
+      $$
+      \frac{d}{dt} \int_{W} \psi (\mathbf{x}, t) dV = \int_{W} \frac{\partial}{\partial t} \psi (\mathbf{x}, t) dV \\
+      $$
 
-    $$
-    \frac{\partial \mathbf{u}}{\partial t} =
-    {\underbrace{ - \mathbf{u} \cdot \nabla \mathbf{u} }_\text{self-advection}} -
-    {\underbrace{ \nabla p }_\text{pressure}}
-    \tag{3}
-    $$
-    $$
-    \text{where~}\forall t{~,~} \nabla \cdot \mathbf{u} = 0
-    $$
+      Now, letting \(S\) denote the surface of \(W\) and \( \mathbf{n} \) the outward normal vector defined along the surface, we can examine
+      the mass flow rate through the surface of \(W\). In particular, observe that the volume flow rate - the <i>volume</i> of fluid that
+      flows through per second </i> - across \(S\) per unit area is \( \mathbf{u} \cdot \mathbf{n} \) and the mass flow rate per unit area
+      is \( \psi \mathbf{u} \cdot \mathbf{n} \).
+    </p>
+    <div>
+      <svg width="586" height="486" viewBox="0 0 586 486" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M175.754 267.823C89.7543 197.823 38.1959 116.823 170.975 101.323C303.754 85.8234 434.975 210.323 507.754 273.823C580.533 337.323 499.754 383.823 435.754 383.823C371.754 383.823 270.754 336.823 175.754 267.823Z" stroke="black" stroke-width="2" stroke-dasharray="12 12"/>
+        <path d="M317 132.5L386 174.071" stroke="#C90BC2" stroke-width="6"/>
+        <path d="M396 88L380.516 95.7626L394.981 105.29L396 88ZM353.253 155.622L389.826 100.099L387.321 98.4488L350.747 153.972L353.253 155.622Z" fill="#C90BC2"/>
+        <path d="M141.261 72.5927L130.012 75.5556L138.247 83.6504L141.261 72.5927ZM67.9195 146.091L135.556 79.603L134.129 78.201L66.4932 144.689L67.9195 146.091Z" fill="black"/>
+        <path d="M90.0543 211.104L78.8056 214.067L87.0402 222.162L90.0543 211.104ZM16.7131 284.602L84.3492 218.115L82.9229 216.713L15.2869 283.2L16.7131 284.602Z" fill="black"/>
+        <path d="M239.734 146.162L228.486 149.125L236.72 157.22L239.734 146.162ZM166.393 219.66L234.029 153.172L232.603 151.77L164.967 218.258L166.393 219.66Z" fill="black"/>
+        <path d="M432.054 82L420.806 84.9629L429.04 93.0576L432.054 82ZM358.713 155.498L426.349 89.0102L424.923 87.6082L357.287 154.096L358.713 155.498Z" fill="black"/>
+        <path d="M346.086 219.731L334.837 222.694L343.072 230.789L346.086 219.731ZM272.745 293.229L340.381 226.742L338.955 225.34L271.318 291.827L272.745 293.229Z" fill="black"/>
+        <path d="M444.56 283.62L433.311 286.583L441.546 294.678L444.56 283.62ZM371.218 357.118L438.854 290.631L437.428 289.229L369.792 355.716L371.218 357.118Z" fill="black"/>
+        <path d="M193.008 299.881L181.759 302.844L189.994 310.939L193.008 299.881ZM119.667 373.379L187.303 306.891L185.876 305.489L118.24 371.977L119.667 373.379Z" fill="black"/>
+        <path d="M308.054 372L296.806 374.963L305.04 383.058L308.054 372ZM234.713 445.498L302.349 379.01L300.923 377.608L233.287 444.096L234.713 445.498Z" fill="black"/>
+        <path d="M550.054 146L538.806 148.963L547.04 157.058L550.054 146ZM476.713 219.498L544.349 153.01L542.923 151.608L475.287 218.096L476.713 219.498Z" fill="black"/>
+        <path d="M284.054 20L272.806 22.9629L281.04 31.0576L284.054 20ZM210.713 93.4979L278.349 27.0103L276.923 25.6082L209.287 92.0959L210.713 93.4979Z" fill="black"/>
+        <path d="M371.616 85.1876C371.616 81.7652 370.139 80 366.176 80C363.583 80 361.349 81.2609 360.124 83.9627H360.088V80L354 80.2882V81.8373C356.234 81.8373 356.486 81.8373 356.486 83.2422V94.6621H354V96.2112C354.829 96.1392 357.422 96.1392 358.431 96.1392C359.44 96.1392 362.07 96.1392 362.898 96.2112V94.6621H360.412V86.9888C360.412 83.0981 363.294 81.1888 365.6 81.1888C366.933 81.1888 367.689 82.0534 367.689 84.7913V94.6621H365.204V96.2112C366.032 96.1392 368.626 96.1392 369.635 96.1392C370.644 96.1392 373.273 96.1392 374.102 96.2112V94.6621H371.616V85.1876Z" fill="#C90BC2"/>
+        <path d="M455.204 74.2882V75.8373C457.437 75.8373 457.689 75.8373 457.689 77.2422V84.3031C457.689 87.041 456.068 89.2385 453.258 89.2385C450.557 89.2385 450.412 88.3379 450.412 86.3565V74L444 74.2882V75.8373C446.234 75.8373 446.486 75.8373 446.486 77.2422V85.7801C446.486 89.3826 448.899 90.4274 452.754 90.4274C453.619 90.4274 456.284 90.4274 457.834 87.5093H457.87V90.4274L464.102 90.2112V88.6621C461.868 88.6621 461.616 88.6621 461.616 87.2572V74L455.204 74.2882Z" fill="black"/>
+        <path d="M524.295 397.307C525.602 395.091 526.852 392.989 530.261 392.648C530.773 392.591 531.284 392.534 531.284 391.625C531.284 391 530.773 391 530.602 391C530.489 391 530.091 391.114 526.341 391.114C524.636 391.114 522.875 391 521.227 391C520.886 391 520.205 391 520.205 392.08C520.205 392.591 520.659 392.648 521 392.648C522.136 392.705 523.955 393.045 523.955 394.807C523.955 395.545 523.727 395.943 523.159 396.909L507.648 424.068L505.602 394.466C505.602 393.784 506.227 392.705 509.409 392.648C510.148 392.648 510.716 392.648 510.716 391.568C510.716 391 510.148 391 509.864 391C507.875 391 505.773 391.114 503.727 391.114H500.773C499.92 391.114 498.898 391 498.045 391C497.705 391 497.023 391 497.023 392.08C497.023 392.648 497.42 392.648 498.386 392.648C501 392.648 501 392.705 501.227 396.17L501.398 398.216L486.682 424.068L484.58 394.75C484.58 394.125 484.58 392.705 488.443 392.648C489.068 392.648 489.693 392.648 489.693 391.625C489.693 391 489.182 391 488.841 391C486.852 391 484.75 391.114 482.705 391.114H479.75C478.898 391.114 477.875 391 477.023 391C476.682 391 476 391 476 392.08C476 392.648 476.455 392.648 477.25 392.648C479.92 392.648 479.977 392.989 480.091 394.807L482.591 429.693C482.648 430.659 482.705 431 483.386 431C483.955 431 484.068 430.773 484.58 429.92L501.511 400.318L503.614 429.693C503.67 430.659 503.727 431 504.409 431C504.977 431 505.148 430.716 505.602 429.92L524.295 397.307Z" fill="black"/>
+      </svg>
+    </div>
+    <p>
+      This gives us the <b>law of conservation of mass</b> in integral form:
 
-    If at every timestep we numerically compute these terms and add them, we can simulate our fluid! In pseudocode:
+      $$
+      \frac{d}{dt} \int_{W} \psi dV = - \int_{S} \psi \mathbf{u} \cdot \mathbf{n} dA
+      $$
 
-    <!-- <dt-code block language="javascript"> -->
+      Can we get rid of the integrals and say something similar for points? By divergence theorem, the above is equivalent to
+
+      $$
+      \int_{W} [\frac{\partial \psi}{\partial t} + \nabla \cdot (\psi \mathbf{u})] dV = 0
+      $$
+
+      Then for a unit subregion \( W = dV \), we can say that
+
+      $$
+      \frac{\partial \psi}{\partial t} + \nabla \cdot (\psi \mathbf{u}) = 0
+      $$
+
+      This gives us an explicit PDE that we need to solve for \( \psi \)!
+    </p>
+    <p>
+      Hmm... we could stop here, but we might be able to simplify this more. Specifically, it looks like we could isolate out
+      a term \( \nabla \cdot \mathbf{u} \) that goes to zero because of incompressibility.
+
+      $$
+      \begin{aligned}
+      &\frac{\partial \psi}{\partial t} = - \nabla \cdot (\psi \mathbf{u}) \\
+      &= - (\frac{\partial}{\partial x} \psi u + \frac{\partial}{\partial y} \psi v) \\
+      &= - (\frac{\partial \psi}{\partial x} u + \frac{\partial u}{\partial x} \psi +  \frac{\partial \psi}{\partial y} v + \frac{\partial v}{\partial y} \psi) \\
+      &= - (\psi \nabla \cdot \mathbf{u} + \mathbf{u} \cdot \nabla \psi) \\
+      &= - \mathbf{u} \cdot \nabla \psi \\
+      \end{aligned}
+      $$
+
+      Applying our incompressibility constraint \( \nabla \cdot \mathbf{u} = 0 \) at the end yields a scalar PDE, the first of our <b>incompressible flow advection equations</b>:
+
+      $$
+      \frac{\partial \psi}{\partial t} = \text{advection} (\mathbf{u}, \psi) = - \mathbf{u} \cdot \nabla \psi \tag{1}
+      $$
+      $$
+      \frac{\partial \mathbf{v}}{\partial t} = \text{advection} (\mathbf{u}, \mathbf{v}) = - \mathbf{u} \cdot \nabla \mathbf{v} \tag{2}
+      $$
+
+      Eq. 2 for advecting a vector field \( \mathbf{v} \) through our velocity field can be derived similarly to the scalar advection equation.
+    </p>
+    <p><b>A Stable Method for Advection</b></p>
+    <p>
+      Let's look closely at eqn. (1):
+      $$
+      \frac{\partial \psi}{\partial t} = - \mathbf{u} \cdot \nabla \psi
+      $$
+    </p>
+    <p>
+      Notice that the right-hand term is a directional derivative in the \( -\mathbf{u} \) direction. This gives us a wonderful new method for
+      advecting \( \psi \) by an incompressible fluid - starting at a grid point \( \mathbf{x} \), trace the fluid velocity <i>backwards</i>,
+      replacing the value at our original point by the value that we land on (if we land between points, we can interpolate):
+
+      $$
+      \psi (\mathbf{x}, t + \Delta t) = \psi (\mathbf{x} - \mathbf{u} (\mathbf{x}, t), t)
+      $$
+
+      In GPU pseudocode:
+    </p>
+    <!-- <dt-code block language="glsl"> -->
+      <pre class="l-middle">
+        <code class="language-glsl">
+          global Vec2Field u;
+          global FloatField density;
+          global float dt;
+
+          // Run for each point in our scalar grid that we want to update
+          float advectPoint(vec2 x) {
+            vec2 coord = x - dt * getVec2At(u, x);
+            return getFloatAt(density, coord);
+          }
+        </code>
+      </pre>
+    <!-- </dt-code> -->
+    <p>
+      This method is called
+      <b>Semi-Lagrangian advection</b> and was invented in 1999 by Jos Stam <dt-cite key="stam1999stable"></dt-cite>.
+      Like Euler, it's first-order accurate, but has exactly the additional properties we need:
+    </p>
+    <ol>
+      <li>
+        It's extremely easy to parallelize because each grid point only gets updated once per iteration.
+      </li>
+      <li>
+        It's <i>unconditionally stable</i>. Why? Observe that for any grid point, the maximum value it can get updated to is the maximum value
+        of all the grid points.
+      </li>
+    </ol>
+    <p>
+      For a fixed velocity field fulfilling the incompressibility constraint, it works great.
+    </p>
+    <div class="l-middle demo">
+      <div class="demo-canvas-cover">
+        <div class="demo-canvas-cover-button">
+          Click and hold
+        </div>
+      </div>
+      <canvas class="demo-canvas" id="velocity-canvas"></canvas>
+    </div>
+    <p>
+      <em>Click anywhere above to drop some dye in the flow</em>
+    </p>
+    <dt-byline></dt-byline>
+    <h3>1.2 The Navier-Stokes Equations</h3>
+    <p>
+      So far we've found a model that describes how scalar properties of a fluid evolve over time, assuming the flow is fixed. What about the fluid flow itself -
+      how does the velocity field \( \mathbf{u} \) affect itself over time?
+    </p>
+    <p>
+      The <b>Navier-Stokes equations</b>
+      <dt-fn>For a detailed derivation, see Chapter 1.3 of Chorin and Marsden (1993).</dt-fn>
+      <dt-fn>
+        Famous for the <a href="https://en.wikipedia.org/wiki/Navier%E2%80%93Stokes_existence_and_smoothness">Navier-Stokes existence
+        and smoothness</a> problem, one of the Clay Institute's seven Millenium Prize problems in math.
+      </dt-fn>
+      for incompressible flow define how the velocity at any point in a fluid evolves over time:
+
+      $$
+      \frac{\partial \mathbf{u}}{\partial t} =
+      {\underbrace{ - \mathbf{u} \cdot \nabla \mathbf{u} }_\text{self-advection}} +
+      {\underbrace{ \mu^2 \nabla \mathbf{u} }_\text{diffusion}} -
+      {\underbrace{ \nabla p }_\text{pressure}} +
+      {\underbrace{ \textbf{F} }_\text{ext. forces}}
+      $$
+      $$
+      \text{where~}\forall t{~,~} \nabla \cdot \mathbf{u} = 0
+      $$
+
+      Here, the constant \( \mu \) is the fluid's viscosity and \( \mathbf{F} \) are
+      external forces. But we assumed earlier that our fluid was <a href="https://en.wikipedia.org/wiki/Inviscid_flow">inviscid</a>,
+      so \( \mu = 0 \), and we can just ignore external forces for now. So we're left with two terms - self-advection and pressure.
+
+      $$
+      \frac{\partial \mathbf{u}}{\partial t} =
+      {\underbrace{ - \mathbf{u} \cdot \nabla \mathbf{u} }_\text{self-advection}} -
+      {\underbrace{ \nabla p }_\text{pressure}}
+      \tag{3}
+      $$
+      $$
+      \text{where~}\forall t{~,~} \nabla \cdot \mathbf{u} = 0
+      $$
+
+      If at every timestep we numerically compute these terms and add them, we can simulate our fluid! In pseudocode:
+
+      <!-- <dt-code block language="javascript"> -->
+        <pre class="l-middle">
+          <code class="language-javascript">
+          let u = createVectorGrid();
+          let density = createScalarGrid();
+          let p = createScalarGrid();
+
+          while (true) {
+            // Solve for the next velocity field.
+            u = advect(u, u);
+
+            p = computePressure(...);
+            u = u - gradient(p);
+
+            // Advect dye through the new velocity field.
+            density = advect(u, density);
+          }
+          </code>
+        </pre>
+        <!-- </dt-code> -->
+    </p>
+    <p>
+      Let's take a closer look at each of these.
+    </p>
+    <p><b>Self-Advection</b></p>
+    <p>
+      From our incompressible advection equations, we can see that the self-advection term is the advection of the fluid's velocity
+      field \( \mathbf{u} \) through itself:
+
+      $$
+      \text{advection} (\mathbf{u}, \mathbf{u}) = - \mathbf{u} \cdot \nabla \mathbf{u} \tag{4}
+      $$
+    </p>
+    <p>
+      Where do the other terms come from? Well, advecting \( \mathbf{u} \) through itself yields a new velocity field
+      \( \mathbf{u}^\prime \) (computable via the Semi-Lagrangian backtracing algorithm from above):
+
+      $$
+      \mathbf{u}^\prime = \mathbf{u} - \mathbf{u} \cdot \nabla \mathbf{u}
+      $$
+    </p>
+    <p><b>Pressure</b></p>
+    <p>
+      We don't know if this new velocity field follows the incompressibility constraint (e.g. has zero divergence).
+      So the pressure term \( p \) needs to correct this somehow:
+
+      $$
+      \nabla \cdot (\mathbf{u}^\prime - \nabla p) = 0
+      $$
+
+      We rearrange this to get
+
+      $$
+      \nabla^2 p = \nabla \cdot \mathbf{u}^\prime \tag{5}
+      $$
+
+      which is a type of equation known as a <i>Poisson equation</i>, where the left-hand side is
+      the <a href="https://en.wikipedia.org/wiki/Laplace_operator">Laplacian</a> of an unknown scalar field and the
+      right-hand side is a known scalar. Solving this Poisson equation is really the slowest computational step
+      in fluid simulation, for reasons we will see shortly.
+    </p>
+    <p><b>Solving for Pressure</b></p>
+    <p>
+      So how do we solve this particular PDE for \( p \)? Well, we know the value of our candidate velocity field \( \mathbf{u}^\prime \)
+      at all of our grid points, so we can approximately compute the right-hand side of the Poisson equation by applying a discrete
+      version <dt-fn>We are using a <a href="https://en.wikipedia.org/wiki/Finite_difference">finite difference</a> where the independent variable is the grid index.</dt-fn> of the divergence everywhere:
+
+      $$
+      \nabla \cdot \mathbf{u}^\prime \approx
+      \frac{ u_{i+1, j} - u_{i-1, j} }{ 2 } +
+      \frac{ v_{i, j+1} - v_{i, j-1} }{ 2 }
+      $$
+
+      where \( \mathbf{u}^\prime = (u, v) \) in 2 dimensions.
+    </p>
+    <p>
+      Then we can use a discrete version of the Laplacian
+
+      $$
+      \nabla^2 p \approx
+      p_{i+1, j} + p_{i-1, j} + p_{i, j+1} + p_{i, j-1} - 4p_{i, j}
+      $$
+
+      to transform the whole equation into a linear equation with five unknowns.
+    </p>
+    <p>
+      But really, we are solving the Poisson equation (5) over all of space at once, so for an \( N \times N \) grid,
+      we end up with a system of \( N^2 \) linear equations with exactly \( N^2 \) unknowns! So we end up with
+      the familiar old equation
+
+      $$
+      \mathbf{Ax} = \mathbf{b}
+      $$
+
+      where \( \mathbf{A} \) is a matrix applying the Laplacian operator to the whole grid and \( \mathbf{b} \) is a vector containing
+      the velocity field's divergence at all grid points.
+    </p>
+    <p>
+      There are many off-the-shelf algorithms for solving linear systems exactly. Unfortunately for us, even the fastest algorithms
+      scale superlinearly with our grid size.
+    </p>
+    <p><b>Solving for Pressure... Efficiently</b></p>
+    <p>
+      If we're going to make a real-time simulation, we need to go fast. Can we leverage the GPU?
+    </p>
+    <p>
+      Well, it's not really possible to achieve an exact solution to the linear system efficiently, but we should
+      note that the linear system is already an approximation to the Poisson equation. And it is possible to achieve
+      arbitrarily accurate approximations with iterative methods - which begin with an estimate and improve solution
+      accuracy every iteration - so we can just pick an iterative algorithm and run it
+      until we have something that's "good enough". One particularly simple and easy-to-implement iterative algorithm for solving
+      linear equations is the <a href="https://en.wikipedia.org/wiki/Jacobi_method">Jacobi method</a>.
+    </p>
+    <p>
+      We start with the very first equation in the system:
+      $$
+      A_{11}x_1 + A_{12}x_2 + ... + A_{1n}x_n = b_1
+      $$
+      At the \(k\)th iteration, given some guess \( \mathbf{x}^k \) for the solution \( \mathbf{x} \), we have some error.
+      We can use this error to update our guess for \( x_1 \) as follows:
+      $$
+      x_1^{k+1} = \frac{ b_1 - A_{12}x_2^k - ... - A_{1n}x_n^k }{ A_{11} }
+      $$
+      In Jacobi, our guesses for all elements of \( \mathbf{x} \) are executed in parallel, giving a perfect
+      match for implementation on the GPU. In pseudocode:
+    </p>
+    <!-- <dt-code block language="glsl"> -->
+      <pre class="l-middle">
+        <code class="language-glsl">
+          global FloatField divergence;
+          global FloatField pressure;
+          global float texelSize;
+
+          // Run for each point in our pressure grid that we want to update
+          float iterateJacobi(vec2 x) {
+            float div = getFloatAt(divergence, x);
+            float L = getFloatAt(pressure, x + vec2(-texelSize, 0.));
+            float R = getFloatAt(pressure, x + vec2(texelSize, 0.));
+            float T = getFloatAt(pressure, x + vec2(0., texelSize));
+            float B = getFloatAt(pressure, x + vec2(0., -texelSize));
+            return (div - L - R - T - B) / -4.;
+          }
+        </code>
+      </pre>
+    <!-- </dt-code> -->
+    <p>
+      It's worth noting that other, faster-converging solvers can also be
+      implemented on the GPU, like the Conjugate Gradient method and the Multigrid method. But depending on
+      the fluid and application, pressure accuracy may not be as important as advection accuracy or ease of implementation.
+      For smoke and fire, changes in fluid volume aren't as apparent as they are for fluids like water
+      <dt-cite key="Crane07"></dt-cite>, and high-quality advection tends to matter more<dt-cite key="Green2014"></dt-cite>.
+    </p>
+    <p><b>Summary: Simulating Navier Stokes</b></p>
+    <p>
+      The math behind Navier-Stokes can be a little bit dense, but at a high-level, simulating a fluid by solving the equations
+      comes down to a few key update procedures on a grid per timestep. For our dye problem, here's our simulation
+      might look:
+
+      <!-- <dt-code block language="javascript"> -->
       <pre class="l-middle">
         <code class="language-javascript">
         let u = createVectorGrid();
         let density = createScalarGrid();
+        let div = createScalarGrid();
         let p = createScalarGrid();
 
         while (true) {
           // Solve for the next velocity field.
           u = advect(u, u);
 
-          p = computePressure(...);
+          // Enforce incompressibility with pressure projection.
+          div = divergence(u);
+          for (let i = 0; i < JACOBI_ITERATIONS; i++) {
+            p = updatePressure(p, div);
+          }
           u = u - gradient(p);
 
           // Advect dye through the new velocity field.
@@ -302,625 +467,461 @@
         </code>
       </pre>
       <!-- </dt-code> -->
-  </p>
-  <p>
-    Let's take a closer look at each of these.
-  </p>
-  <p><b>Self-Advection</b></p>
-  <p>
-    From our incompressible advection equations, we can see that the self-advection term is the advection of the fluid's velocity
-    field \( \mathbf{u} \) through itself:
 
-    $$
-    \text{advection} (\mathbf{u}, \mathbf{u}) = - \mathbf{u} \cdot \nabla \mathbf{u} \tag{4}
-    $$
-  </p>
-  <p>
-    Where do the other terms come from? Well, advecting \( \mathbf{u} \) through itself yields a new velocity field
-    \( \mathbf{u}^\prime \) (computable via the Semi-Lagrangian backtracing algorithm from above):
+    </p>
+    <dt-byline></dt-byline>
+    <h3>1.3 Vorticity Confinement</h3>
+    <p>
+      Using a grid to store our velocity field is extremely convenient, but it results in unwanted
+      numerical smoothing whenever we have to interpolate values between grid points.
+      This combined with the relatively coarse approximation of a first-order Semi-Lagrangian advection
+      scheme has the effect of dissipating out turbulent vortices in our flow. Physically, the velocity field
+      loses energy, and the end result is generally overly smooth, "boring" fluid flow.
+    </p>
+    <p>
+      One way to combat lost vorticity is to increase the resolution of our grid, but this isn't really feasible
+      for real-time simulations that have limited computational resources. What we would ideally
+      like to do is find all the small details that get smoothed over each step of the simulation, and <i>amplify</i>
+      them. This process is called vorticity confinement - admittedly, it's not totally realistic, but succeeds in
+      preserving small scale details in more or less physically correct locations <dt-cite key="fedkiw2001visual"></dt-cite>.
+      Indeed, it was originally invented to resolve very complex flow fields in engineering simulations of helicopter blades,
+      where it just wasn't possible to add the number of necessary grid points <dt-cite key="steinhoff1994modification"></dt-cite>.
+    </p>
+    <p>
+      The smallest turbulent features we can find are the vortices centered at each grid point in our simulation.
+      We can measure the intensity of these vortices (the <i>vorticity</i> of them) by taking the curl of \( \mathbf{u} \)
+      at each point, and amplify them by essentially adding a circular flow scaled by vorticity about each point.
+      Mathematically, the vorticity is defined by
 
-    $$
-    \mathbf{u}^\prime = \mathbf{u} - \mathbf{u} \cdot \nabla \mathbf{u}
-    $$
-  </p>
-  <p><b>Pressure</b></p>
-  <p>
-    We don't know if this new velocity field follows the incompressibility constraint (e.g. has zero divergence).
-    So the pressure term \( p \) needs to correct this somehow:
+      $$
+      \bm{\omega} = \nabla \times \mathbf{u}
+      $$
 
-    $$
-    \nabla \cdot (\mathbf{u}^\prime - \nabla p) = 0
-    $$
+      For each grid point, we compute a normalized location vector that points to the highest nearby vorticity concentration:
 
-    We rearrange this to get
+      $$
+      \mathbf{N} = \frac{ \nabla | \bm{\omega} | }{ | \nabla | \bm{\omega} | | }
+      $$
 
-    $$
-    \nabla^2 p = \nabla \cdot \mathbf{u}^\prime \tag{5}
-    $$
+      And finally, we compute the confined vorticity vector field and add it to our flow:
 
-    which is a type of equation known as a <i>Poisson equation</i>, where the left-hand side is
-    the <a href="https://en.wikipedia.org/wiki/Laplace_operator">Laplacian</a> of an unknown scalar field and the
-    right-hand side is a known scalar. Solving this Poisson equation is really the slowest computational step
-    in fluid simulation, for reasons we will see shortly.
-  </p>
-  <p><b>Solving for Pressure</b></p>
-  <p>
-    So how do we solve this particular PDE for \( p \)? Well, we know the value of our candidate velocity field \( \mathbf{u}^\prime \)
-    at all of our grid points, so we can approximately compute the right-hand side of the Poisson equation by applying a discrete
-    version <dt-fn>We are using a <a href="https://en.wikipedia.org/wiki/Finite_difference">finite difference</a> where the independent variable is the grid index.</dt-fn> of the divergence everywhere:
+      $$
+      \mathbf{f_{conf}} = \epsilon (\mathbf{N} \times \bm{\omega})
+      $$
+      $$
+      \mathbf{u_{conf}} = \mathbf{u} + \mathbf{f_{conf}}
+      $$
 
-    $$
-    \nabla \cdot \mathbf{u}^\prime \approx
-    \frac{ u_{i+1, j} - u_{i-1, j} }{ 2 } +
-    \frac{ v_{i, j+1} - v_{i, j-1} }{ 2 }
-    $$
-
-    where \( \mathbf{u}^\prime = (u, v) \) in 2 dimensions.
-  </p>
-  <p>
-    Then we can use a discrete version of the Laplacian
-
-    $$
-    \nabla^2 p \approx
-    p_{i+1, j} + p_{i-1, j} + p_{i, j+1} + p_{i, j-1} - 4p_{i, j}
-    $$
-
-    to transform the whole equation into a linear equation with five unknowns.
-  </p>
-  <p>
-    But really, we are solving the Poisson equation (5) over all of space at once, so for an \( N \times N \) grid,
-    we end up with a system of \( N^2 \) linear equations with exactly \( N^2 \) unknowns! So we end up with
-    the familiar old equation
-
-    $$
-    \mathbf{Ax} = \mathbf{b}
-    $$
-
-    where \( \mathbf{A} \) is a matrix applying the Laplacian operator to the whole grid and \( \mathbf{b} \) is a vector containing
-    the velocity field's divergence at all grid points.
-  </p>
-  <p>
-    There are many off-the-shelf algorithms for solving linear systems exactly. Unfortunately for us, even the fastest algorithms
-    scale superlinearly with our grid size.
-  </p>
-  <p><b>Solving for Pressure... Efficiently</b></p>
-  <p>
-    If we're going to make a real-time simulation, we need to go fast. Can we leverage the GPU?
-  </p>
-  <p>
-    Well, it's not really possible to achieve an exact solution to the linear system efficiently, but we should
-    note that the linear system is already an approximation to the Poisson equation. And it is possible to achieve
-    arbitrarily accurate approximations with iterative methods - which begin with an estimate and improve solution
-    accuracy every iteration - so we can just pick an iterative algorithm and run it
-    until we have something that's "good enough". One particularly simple and easy-to-implement iterative algorithm for solving
-    linear equations is the <a href="https://en.wikipedia.org/wiki/Jacobi_method">Jacobi method</a>.
-  </p>
-  <p>
-    We start with the very first equation in the system:
-    $$
-    A_{11}x_1 + A_{12}x_2 + ... + A_{1n}x_n = b_1
-    $$
-    At the \(k\)th iteration, given some guess \( \mathbf{x}^k \) for the solution \( \mathbf{x} \), we have some error.
-    We can use this error to update our guess for \( x_1 \) as follows:
-    $$
-    x_1^{k+1} = \frac{ b_1 - A_{12}x_2^k - ... - A_{1n}x_n^k }{ A_{11} }
-    $$
-    In Jacobi, our guesses for all elements of \( \mathbf{x} \) are executed in parallel, giving a perfect
-    match for implementation on the GPU. In pseudocode:
-  </p>
-  <!-- <dt-code block language="glsl"> -->
-    <pre class="l-middle">
-      <code class="language-glsl">
-        global FloatField divergence;
-        global FloatField pressure;
-        global float texelSize;
-
-        // Run for each point in our pressure grid that we want to update
-        float iterateJacobi(vec2 x) {
-          float div = getFloatAt(divergence, x);
-          float L = getFloatAt(pressure, x + vec2(-texelSize, 0.));
-          float R = getFloatAt(pressure, x + vec2(texelSize, 0.));
-          float T = getFloatAt(pressure, x + vec2(0., texelSize));
-          float B = getFloatAt(pressure, x + vec2(0., -texelSize));
-          return (div - L - R - T - B) / -4.;
-        }
-      </code>
-    </pre>
-  <!-- </dt-code> -->
-  <p>
-    It's worth noting that other, faster-converging solvers can also be
-    implemented on the GPU, like the Conjugate Gradient method and the Multigrid method. But depending on
-    the fluid and application, pressure accuracy may not be as important as advection accuracy or ease of implementation.
-    For smoke and fire, changes in fluid volume aren't as apparent as they are for fluids like water
-    <dt-cite key="Crane07"></dt-cite>, and high-quality advection tends to matter more<dt-cite key="Green2014"></dt-cite>.
-  </p>
-  <p><b>Summary: Simulating Navier Stokes</b></p>
-  <p>
-    The math behind Navier-Stokes can be a little bit dense, but at a high-level, simulating a fluid by solving the equations
-    comes down to a few key update procedures on a grid per timestep. For our dye problem, here's our simulation
-    might look:
-
-    <!-- <dt-code block language="javascript"> -->
-    <pre class="l-middle">
-      <code class="language-javascript">
-      let u = createVectorGrid();
-      let density = createScalarGrid();
-      let div = createScalarGrid();
-      let p = createScalarGrid();
-
-      while (true) {
-        // Solve for the next velocity field.
-        u = advect(u, u);
-
-        // Enforce incompressibility with pressure projection.
-        div = divergence(u);
-        for (let i = 0; i < JACOBI_ITERATIONS; i++) {
-          p = updatePressure(p, div);
-        }
-        u = u - gradient(p);
-
-        // Advect dye through the new velocity field.
-        density = advect(u, density);
-      }
-      </code>
-    </pre>
-    <!-- </dt-code> -->
-
-  </p>
-  <dt-byline></dt-byline>
-  <h3>1.3 Vorticity Confinement</h3>
-  <p>
-    Using a grid to store our velocity field is extremely convenient, but it results in unwanted
-    numerical smoothing whenever we have to interpolate values between grid points.
-    This combined with the relatively coarse approximation of a first-order Semi-Lagrangian advection
-    scheme has the effect of dissipating out turbulent vortices in our flow. Physically, the velocity field
-    loses energy, and the end result is generally overly smooth, "boring" fluid flow.
-  </p>
-  <p>
-    One way to combat lost vorticity is to increase the resolution of our grid, but this isn't really feasible
-    for real-time simulations that have limited computational resources. What we would ideally
-    like to do is find all the small details that get smoothed over each step of the simulation, and <i>amplify</i>
-    them. This process is called vorticity confinement - admittedly, it's not totally realistic, but succeeds in
-    preserving small scale details in more or less physically correct locations <dt-cite key="fedkiw2001visual"></dt-cite>.
-    Indeed, it was originally invented to resolve very complex flow fields in engineering simulations of helicopter blades,
-    where it just wasn't possible to add the number of necessary grid points <dt-cite key="steinhoff1994modification"></dt-cite>.
-  </p>
-  <p>
-    The smallest turbulent features we can find are the vortices centered at each grid point in our simulation.
-    We can measure the intensity of these vortices (the <i>vorticity</i> of them) by taking the curl of \( \mathbf{u} \)
-    at each point, and amplify them by essentially adding a circular flow scaled by vorticity about each point.
-    Mathematically, the vorticity is defined by
-
-    $$
-    \bm{\omega} = \nabla \times \mathbf{u}
-    $$
-
-    For each grid point, we compute a normalized location vector that points to the highest nearby vorticity concentration:
-
-    $$
-    \mathbf{N} = \frac{ \nabla | \bm{\omega} | }{ | \nabla | \bm{\omega} | | }
-    $$
-
-    And finally, we compute the confined vorticity vector field and add it to our flow:
-
-    $$
-    \mathbf{f_{conf}} = \epsilon (\mathbf{N} \times \bm{\omega})
-    $$
-    $$
-    \mathbf{u_{conf}} = \mathbf{u} + \mathbf{f_{conf}}
-    $$
-
-    Here, the confinement constant \( \epsilon > 0 \) is a parameter controlling the amount of small scale detail added
-    back to the flow. Even low confinement levels (around 0-15) can make a huge difference, especially for simulations
-    using Semi-Lagrangian advection schemes, and higher confinement levels can create highly stylized, billowing flows.
-  </p>
-  <div class="l-middle demo">
-    <div class="demo-canvas-cover">
-      <div class="demo-canvas-cover-button">
-        Click and hold
+      Here, the confinement constant \( \epsilon > 0 \) is a parameter controlling the amount of small scale detail added
+      back to the flow. Even low confinement levels (around 0-15) can make a huge difference, especially for simulations
+      using Semi-Lagrangian advection schemes, and higher confinement levels can create highly stylized, billowing flows.
+    </p>
+    <div class="l-middle demo">
+      <div class="demo-canvas-cover">
+        <div class="demo-canvas-cover-button">
+          Click and hold
+        </div>
       </div>
+      <canvas class="demo-canvas" id="vorticity-canvas"></canvas>
     </div>
-    <canvas class="demo-canvas" id="vorticity-canvas"></canvas>
-  </div>
-  <p>
-    <em>Click and drag to drop some dye in the turbulent simulation above</em>
-  </p>
-  <p>
-    On the GPU, we can compute curl and confinement like so:
-  </p>
-  <!-- <dt-code block language="glsl"> -->
-    <pre class="l-middle">
-      <code class="language-glsl">
-        global Vec2Field u;
-        global float texelSize;
-
-        // Run to get curl for each point in grid
-        float computeCurl(vec2 x) {
-          float L = getVec2At(u, x + vec2(-texelSize, 0.)).y;
-          float R = getVec2At(u, x + vec2(texelSize, 0.)).y;
-          float T = getVec2At(u, x + vec2(0., texelSize)).x;
-          float B = getVec2At(u, x + vec2(0., -texelSize)).x;
-          return (R - L) - (T - B);
-        }
-
-        global Vec2Field curl;
-        global float confinement;
-
-        // Run to get confinement force for each point in grid
-        vec2 confinementForce(vec2 x) {
-          float L = getFloatAt(curl, x + vec2(-texelSize, 0.));
-          float R = getFloatAt(curl, x + vec2(texelSize, 0.));
-          float T = getFloatAt(curl, x + vec2(0., texelSize));
-          float B = getFloatAt(curl, x + vec2(0., -texelSize));
-          float C = getFloatAt(curl, x);
-
-          vec2 N = vec2(abs(T) - abs(B), abs(R) - abs(L));
-          N = N / length(N);
-          return confinement * C;
-        }
-      </code>
-    </pre>
-  <!-- </dt-code> -->
-  <p>
-    The full simulation with turbulence:
-    <!-- <dt-code block language="javascript"> -->
+    <p>
+      <em>Click and drag to drop some dye in the turbulent simulation above</em>
+    </p>
+    <p>
+      On the GPU, we can compute curl and confinement like so:
+    </p>
+    <!-- <dt-code block language="glsl"> -->
       <pre class="l-middle">
-        <code class="language-javascript">
-        let u = createVectorGrid();
-        let density = createScalarGrid();
-        let div = createScalarGrid();
-        let p = createScalarGrid();
-        let curl = createVectorGrid();
+        <code class="language-glsl">
+          global Vec2Field u;
+          global float texelSize;
 
-        while (true) {
-          // Solve for the next velocity field.
-          u = advect(u, u);
-
-          // Use vorticity confinement to amplify turbulence of velocity field.
-          curl = computeCurl(u);
-          u = u + confinementForce(curl, CONFINEMENT);
-
-          // Enforce incompressibility with pressure projection.
-          div = divergence(u);
-          for (let i = 0; i < JACOBI_ITERATIONS; i++) {
-            p = updatePressure(p, div);
+          // Run to get curl for each point in grid
+          float computeCurl(vec2 x) {
+            float L = getVec2At(u, x + vec2(-texelSize, 0.)).y;
+            float R = getVec2At(u, x + vec2(texelSize, 0.)).y;
+            float T = getVec2At(u, x + vec2(0., texelSize)).x;
+            float B = getVec2At(u, x + vec2(0., -texelSize)).x;
+            return (R - L) - (T - B);
           }
-          u = u - gradient(p);
 
-          // Advect dye through the new velocity field.
-          density = advect(u, density);
-        }
+          global Vec2Field curl;
+          global float confinement;
+
+          // Run to get confinement force for each point in grid
+          vec2 confinementForce(vec2 x) {
+            float L = getFloatAt(curl, x + vec2(-texelSize, 0.));
+            float R = getFloatAt(curl, x + vec2(texelSize, 0.));
+            float T = getFloatAt(curl, x + vec2(0., texelSize));
+            float B = getFloatAt(curl, x + vec2(0., -texelSize));
+            float C = getFloatAt(curl, x);
+
+            vec2 N = vec2(abs(T) - abs(B), abs(R) - abs(L));
+            N = N / length(N);
+            return confinement * C;
+          }
         </code>
       </pre>
     <!-- </dt-code> -->
-  </p>
-  <p><b>Curl-Noise Turbulence</b></p>
-  <p>
-    Curl noise is a method that essentially does the same thing as vorticity confinement, but instead of measuring
-    and amplifying the vorticity of the velocity field, a scalar vorticity field is made from scratch using noise functions.
-    Mathematically, we can combine vorticity confinement and curl-noise turbulence by  synthesizing a random
-    vorticity field
+    <p>
+      The full simulation with turbulence:
+      <!-- <dt-code block language="javascript"> -->
+        <pre class="l-middle">
+          <code class="language-javascript">
+          let u = createVectorGrid();
+          let density = createScalarGrid();
+          let div = createScalarGrid();
+          let p = createScalarGrid();
+          let curl = createVectorGrid();
 
-    $$
-    \bm{\phi} = \text{rand} * \mathbf{z}
-    $$
+          while (true) {
+            // Solve for the next velocity field.
+            u = advect(u, u);
 
-    Then computing our final vorticity field by
+            // Use vorticity confinement to amplify turbulence of velocity field.
+            curl = computeCurl(u);
+            u = u + confinementForce(curl, CONFINEMENT);
 
-    $$
-    \bm{\omega}^* = \bm{\omega} + \bm{\phi}
-    $$
+            // Enforce incompressibility with pressure projection.
+            div = divergence(u);
+            for (let i = 0; i < JACOBI_ITERATIONS; i++) {
+              p = updatePressure(p, div);
+            }
+            u = u - gradient(p);
 
-    Fast-moving, highly-turbulent fluids like smoke and fire benefit the most from vorticity confinement and curl noise,
-    and in practice the curl noise field \( \bm{\phi} \) both evolves with time and is also advected by the fluid flow.
-  </p>
-  <dt-byline></dt-byline>
-  <h2>2. Fire Simulation</h2>
-  <p>
-    If you've gotten this far, pat yourself on the back! The methods in the previous section let us efficiently
-    and accurately simulate fluids with varying physical parameters (oil, water, honey)
-    assuming the fluid domain is a fixed space. Those interested in handling varying domains (that is, fluids that occupy different regions
-    within the grid, like a half-full cup of water that sloshes around) will want to explore accounting for different boundary conditions
-    within the grid simulation <dt-fn>I suggest <b>Dynamic Obstacles</b> in
-    <a href="https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch30.html">GPU Gems 3 Chapter 30.2</a>
-    <dt-cite key="Crane07"></dt-cite> for details on adding this to our grid simulation.
-    There are also non grid-based methods, but those are outside scope here. </dt-fn>.
-  </p>
-  <p>
-    Simulating fire and smoke requires a couple additions. First, we'll need to add channels representing
-    fuel and temperature to our simulation, and model the combustion of fuel to create heat. Next we'll address how hot pockets
-    of our fluid rise with a thermal buoyancy model, and finally, we'll need to render our flames correctly, taking into account
-    blackbody radiation of the flames, human perception of light, and fire movement.
-  </p>
-  <h3>2.1 A Basic Combustion Model</h3>
-  <p>
-    Chemically, fire is caused by the oxidation of a fuel material in a reaction that releases both heat and light.
-    In our case, we can assume that any fuel in our system has already ignited and is actively adding heat; we won't worry
-    about the problem of unignited fuel.
-  </p>
-  <p>
-    To be more specific, let's define a scalar field \( \rho \) where \( 0 \leq \rho \leq 1 \) represents the density of fuel and
-    another scalar field \( T > 0 \) representing the temperature of the fluid everywhere. At every timestep, temperature is
-    added to the system by the fuel, which burns at a given burn temperature:
-
-    $$
-    T^\prime = \text{max} ( T, \rho * T_{\text{burn}} )
-    $$
-
-    Of course, temperature isn't static - heat diffuses from hot to cold areas, and with fluids in particular, large-scale movements
-    of molecules transport heat. The combination of these 2 processes defines <a href="https://en.wikipedia.org/wiki/Convection">heat convection</a>,
-    and conveniently, we already have a mathematical model for how it works - advection! Simulation-wise, we advect our temperature
-    field along our velocity field. Since any reacting molecules are also moved by the fluid, we should advect fuel as well.
-    The heat itself also affects the movement of the fluid - we'll see how to handle this shortly.
-  </p>
-  <p>
-    Furthermore, hot molecules radiate off temperature as light<dt-fn>This is called blackbody radiation, and we'll return
-    to it when rendering the fire color. The soot particles present in most fire radiate like ideal blackbodies.</dt-fn> according to the
-    <a href="https://en.wikipedia.org/wiki/Stefan%E2%80%93Boltzmann_law">Stefan-Boltzmann Law</a>,
-    in a quintic equation <dt-cite key="nguyen2002physically"></dt-cite>:
-
-    $$
-    T^\prime = T - \sigma_{\text{cool}} ( \frac{T}{T_{\text{max}}} )^4 * \Delta t
-    $$
-
-    Here, \( \sigma_{\text{cool}} \) is the cooling rate parameter. For a physically correct simulation, we would set it to the Stefan-Boltzmann constant,
-    but for a graphical simulation, it's nice for the artist to be able to control the rate of cooling.
-  </p>
-  <p>
-    To complete our combustion model, note that our fuel is always burning (we can imagine it as the density of ionized gas particles
-    that give off thermal energy and return to a lower energy state), so every timestep we dissipate it by some given burn
-    rate \( \gamma_{fuel} \):
-    $$
-    \rho^\prime = \rho (1 - \gamma_{fuel})^{\Delta t}
-    $$
-  </p>
-  <h3>2.2 Thermal Buoyancy</h3>
-  <p>
-    So far, our temperature field doesn't do anything to our fluid flow. But it should - hot pockets of air should expand and rise, and cooler pockets should fall.
-    We can model this with a thermal buoyancy force. Since we're assuming incompressibility, we won't actually handle air expansion, but the fluid flow
-    should experience an upward force depending on temperature:
-
-    $$
-    \mathbf{u}^\prime = \mathbf{u} + (\beta T \Delta t) \mathbf{j}
-    $$
-
-    Here, \( \beta \) is a given positive buoyancy constant, and \( \mathbf{j} \) is the upward unit vector.
-  </p>
-  <p>
-    Adding a combustion model and thermal buoyancy force gives us a fantastic simulator for a decidedly "fire-like" fluid -
-    with the right values of buoyancy and cooling, we can get bulky, billowing plumes of material.
-    Not exactly flames, but very similar to smoke.
-  </p>
-  <p>
-    Tap and drag in the simulation below to inject some combusting fuel.
-    The displayed pixels represent density of smoke particles, which dissipate at a constant rate instead of being used
-    up during combustion, but are still advected by the fluid simulation.
-  </p>
-  <div class="l-middle demo">
-    <div class="demo-canvas-cover">
-      <div class="demo-canvas-cover-button">
-        Click and hold
-      </div>
-    </div>
-    <canvas class="demo-canvas" id="smoke-canvas"></canvas>
-  </div>
-  <p>
-    <em>Click and drag to add smoke above</em>
-  </p>
-  <p>
-    The simulation code builds off the basic fluid routines:
-    <!-- <dt-code block language="javascript"> -->
-      <pre class="l-middle">
-        <code class="language-javascript">
-        let u = createVectorGrid();
-        let density = createScalarGrid();
-        let div = createScalarGrid();
-        let p = createScalarGrid();
-        let curl = createVectorGrid();
-        let fuel = createScalarGrid();
-        let temp = createScalarGrid();
-
-        while (true) {
-          // Solve for the next velocity field.
-          u = advect(u, u);
-
-          // Combustion step.
-          temp = combust(temp, fuel);
-
-          // Use vorticity confinement to amplify turbulence of velocity field.
-          curl = computeCurl(u);
-          u = u + confineVorticity(curl, CONFINEMENT);
-
-          // Add thermal buoyancy.
-          u = u + buoyancy(temp);
-
-          // Enforce incompressibility with pressure projection.
-          div = divergence(u);
-          for (let i = 0; i < JACOBI_ITERATIONS; i++) {
-            p = updatePressure(p, div);
+            // Advect dye through the new velocity field.
+            density = advect(u, density);
           }
-          u = u - gradient(p);
+          </code>
+        </pre>
+      <!-- </dt-code> -->
+    </p>
+    <p><b>Curl-Noise Turbulence</b></p>
+    <p>
+      Curl noise is a method that essentially does the same thing as vorticity confinement, but instead of measuring
+      and amplifying the vorticity of the velocity field, a scalar vorticity field is made from scratch using noise functions.
+      Mathematically, we can combine vorticity confinement and curl-noise turbulence by  synthesizing a random
+      vorticity field
 
-          // Advect dye through the new velocity field.
-          density = advect(u, density);
-        }
-        </code>
-      </pre>
-    <!-- </dt-code> -->
-  </p>
-  <h3>2.3 Fire Rendering</h3>
-  <p>
-    Fire is a <a href="http://old.cescg.org/CESCG-2000/SMaierhofer/node6.html">participating medium</a>,
-    meaning it emits light through blackbody radiation<dt-fn>Besides emitting its own blackbody radiation, fire also scatters light that passes through it. For more, see
-    5.1 in <a href="http://physbam.stanford.edu/~fedkiw/papers/stanford2002-02.pdf">Nguyen et al. 2002</a>
-    <dt-cite key="nguyen2002physically"></dt-cite>.</dt-fn>. This is what gives fire its orange and red colors;
-    rendering our combusting fuel simulation using the correct formula is then all we need to go from smoke to fire!
-  </p>
-  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Gluehfarben_no_language_horizontal.svg/2880px-Gluehfarben_no_language_horizontal.svg.png" class="l-middle">
-  <p>
-    <em>The temperature-to-color spectrum as described by Planck's law</em>
-  </p>
-  <p>
-    <a href="https://en.wikipedia.org/wiki/Planck%27s_law">Planck's Law</a> describes the spectral density of light radiated by
-    a black body at a given temperature \( T \):
+      $$
+      \bm{\phi} = \text{rand} * \mathbf{z}
+      $$
 
-    $$
-    M(\lambda, T) = \frac{ c_1 }{ \lambda^5 } \frac{ 1 }{ \exp{ \frac{c_2}{\lambda T} } - 1 }
-    $$
+      Then computing our final vorticity field by
 
-    where
-    $$
-    c_1 = 2 \pi h c^2 \\
-    c_2 = \frac{hc}{k}
-    $$
+      $$
+      \bm{\omega}^* = \bm{\omega} + \bm{\phi}
+      $$
 
-    and \(h\), \(c\), and \(k\) are Planck's constant, the speed of light, and Boltzmann's constant, respectively.
-  </p>
-  <p>
-    After implementing blackbody rendering using fragment shaders, we have a complete fire simulation!
-  </p>
-  <div class="l-middle demo">
-    <div class="demo-canvas-cover">
-      <div class="demo-canvas-cover-button">
-        Click and hold
+      Fast-moving, highly-turbulent fluids like smoke and fire benefit the most from vorticity confinement and curl noise,
+      and in practice the curl noise field \( \bm{\phi} \) both evolves with time and is also advected by the fluid flow.
+    </p>
+    <dt-byline></dt-byline>
+    <h2>2. Fire Simulation</h2>
+    <p>
+      If you've gotten this far, pat yourself on the back! The methods in the previous section let us efficiently
+      and accurately simulate fluids with varying physical parameters (oil, water, honey)
+      assuming the fluid domain is a fixed space. Those interested in handling varying domains (that is, fluids that occupy different regions
+      within the grid, like a half-full cup of water that sloshes around) will want to explore accounting for different boundary conditions
+      within the grid simulation <dt-fn>I suggest <b>Dynamic Obstacles</b> in
+      <a href="https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch30.html">GPU Gems 3 Chapter 30.2</a>
+      <dt-cite key="Crane07"></dt-cite> for details on adding this to our grid simulation.
+      There are also non grid-based methods, but those are outside scope here. </dt-fn>.
+    </p>
+    <p>
+      Simulating fire and smoke requires a couple additions. First, we'll need to add channels representing
+      fuel and temperature to our simulation, and model the combustion of fuel to create heat. Next we'll address how hot pockets
+      of our fluid rise with a thermal buoyancy model, and finally, we'll need to render our flames correctly, taking into account
+      blackbody radiation of the flames, human perception of light, and fire movement.
+    </p>
+    <h3>2.1 A Basic Combustion Model</h3>
+    <p>
+      Chemically, fire is caused by the oxidation of a fuel material in a reaction that releases both heat and light.
+      In our case, we can assume that any fuel in our system has already ignited and is actively adding heat; we won't worry
+      about the problem of unignited fuel.
+    </p>
+    <p>
+      To be more specific, let's define a scalar field \( \rho \) where \( 0 \leq \rho \leq 1 \) represents the density of fuel and
+      another scalar field \( T > 0 \) representing the temperature of the fluid everywhere. At every timestep, temperature is
+      added to the system by the fuel, which burns at a given burn temperature:
+
+      $$
+      T^\prime = \text{max} ( T, \rho * T_{\text{burn}} )
+      $$
+
+      Of course, temperature isn't static - heat diffuses from hot to cold areas, and with fluids in particular, large-scale movements
+      of molecules transport heat. The combination of these 2 processes defines <a href="https://en.wikipedia.org/wiki/Convection">heat convection</a>,
+      and conveniently, we already have a mathematical model for how it works - advection! Simulation-wise, we advect our temperature
+      field along our velocity field. Since any reacting molecules are also moved by the fluid, we should advect fuel as well.
+      The heat itself also affects the movement of the fluid - we'll see how to handle this shortly.
+    </p>
+    <p>
+      Furthermore, hot molecules radiate off temperature as light<dt-fn>This is called blackbody radiation, and we'll return
+      to it when rendering the fire color. The soot particles present in most fire radiate like ideal blackbodies.</dt-fn> according to the
+      <a href="https://en.wikipedia.org/wiki/Stefan%E2%80%93Boltzmann_law">Stefan-Boltzmann Law</a>,
+      in a quintic equation <dt-cite key="nguyen2002physically"></dt-cite>:
+
+      $$
+      T^\prime = T - \sigma_{\text{cool}} ( \frac{T}{T_{\text{max}}} )^4 * \Delta t
+      $$
+
+      Here, \( \sigma_{\text{cool}} \) is the cooling rate parameter. For a physically correct simulation, we would set it to the Stefan-Boltzmann constant,
+      but for a graphical simulation, it's nice for the artist to be able to control the rate of cooling.
+    </p>
+    <p>
+      To complete our combustion model, note that our fuel is always burning (we can imagine it as the density of ionized gas particles
+      that give off thermal energy and return to a lower energy state), so every timestep we dissipate it by some given burn
+      rate \( \gamma_{fuel} \):
+      $$
+      \rho^\prime = \rho (1 - \gamma_{fuel})^{\Delta t}
+      $$
+    </p>
+    <h3>2.2 Thermal Buoyancy</h3>
+    <p>
+      So far, our temperature field doesn't do anything to our fluid flow. But it should - hot pockets of air should expand and rise, and cooler pockets should fall.
+      We can model this with a thermal buoyancy force. Since we're assuming incompressibility, we won't actually handle air expansion, but the fluid flow
+      should experience an upward force depending on temperature:
+
+      $$
+      \mathbf{u}^\prime = \mathbf{u} + (\beta T \Delta t) \mathbf{j}
+      $$
+
+      Here, \( \beta \) is a given positive buoyancy constant, and \( \mathbf{j} \) is the upward unit vector.
+    </p>
+    <p>
+      Adding a combustion model and thermal buoyancy force gives us a fantastic simulator for a decidedly "fire-like" fluid -
+      with the right values of buoyancy and cooling, we can get bulky, billowing plumes of material.
+      Not exactly flames, but very similar to smoke.
+    </p>
+    <p>
+      Tap and drag in the simulation below to inject some combusting fuel.
+      The displayed pixels represent density of smoke particles, which dissipate at a constant rate instead of being used
+      up during combustion, but are still advected by the fluid simulation.
+    </p>
+    <div class="l-middle demo">
+      <div class="demo-canvas-cover">
+        <div class="demo-canvas-cover-button">
+          Click and hold
+        </div>
       </div>
+      <canvas class="demo-canvas" id="smoke-canvas"></canvas>
     </div>
-    <canvas class="demo-canvas" id="fire-canvas"></canvas>
-  </div>
-  <p>
-    <em>Click and drag to add fire above</em>
-  </p>
-  <p>
-    That's it for these notes! There is of course much more to fluid and fire simulation not covered here, like
-    different (e.g. non-grid-based) techniques for solving the same problem of simulation within a fixed volume,
-    different problems to solve involving varying domains or dynamic obstacles, enhancements to rendering like
-    more accurate blackbody radiation, light scattering, or post-processing effects. Helpful introductions
-    to these topics can be found in references below.
-  </p>
-</dt-article>
+    <p>
+      <em>Click and drag to add smoke above</em>
+    </p>
+    <p>
+      The simulation code builds off the basic fluid routines:
+      <!-- <dt-code block language="javascript"> -->
+        <pre class="l-middle">
+          <code class="language-javascript">
+          let u = createVectorGrid();
+          let density = createScalarGrid();
+          let div = createScalarGrid();
+          let p = createScalarGrid();
+          let curl = createVectorGrid();
+          let fuel = createScalarGrid();
+          let temp = createScalarGrid();
 
-<dt-appendix>
-</dt-appendix>
+          while (true) {
+            // Solve for the next velocity field.
+            u = advect(u, u);
 
-<script type="text/bibliography">
-@InBook{Crane07,
-  author = "Crane, Keenan and Llamas, Ignacio, and Tariq, Sarah",
-  title = "Real Time Simulation and Rendering of 3D Fluids",
-  booktitle = "GPUGems 3",
-  editor = "Hubert Nguyen",
-  chapter = "30",
-  publisher = "Addison-Wesley",
-  year = "2007"
-}
-@inproceedings{horvath2009directable,
-  title={Directable, high-resolution simulation of fire on the GPU},
-  author={Horvath, Christopher and Geiger, Willi},
-  booktitle={ACM Transactions on Graphics (TOG)},
-  volume={28},
-  number={3},
-  pages={41},
-  year={2009},
-  organization={ACM}
-}
-@inproceedings{stam1999stable,
-  title={Stable fluids},
-  author={Stam, Jos},
-  booktitle={Proceedings of the 26th annual conference on Computer graphics and interactive techniques},
-  pages={121--128},
-  year={1999},
-  organization={ACM Press/Addison-Wesley Publishing Co.}
-}
-@inproceedings{nguyen2002physically,
-  title={Physically based modeling and animation of fire},
-  author={Nguyen, Duc Quang and Fedkiw, Ronald and Jensen, Henrik Wann},
-  booktitle={ACM Transactions on Graphics (TOG)},
-  volume={21},
-  number={3},
-  pages={721--728},
-  year={2002},
-  organization={ACM}
-}
-@inproceedings{harris2005fast,
-  title={Fast fluid dynamics simulation on the GPU.},
-  author={Harris, Mark J},
-  booktitle={SIGGRAPH Courses},
-  pages={220},
-  year={2005},
-  url={http://developer.download.nvidia.com/books/HTML/gpugems/gpugems_ch38.html}
-}
-@inproceedings{Aitken:2004:LRV:1103900.1103911,
- author = {Aitken, Matt and Butler, Greg and Lemmon, Dan and Saindon, Eric and Peters, Dana and Williams, Guy},
- title = {The Lord of the Rings: The Visual Effects That Brought Middle Earth to the Screen},
- booktitle = {ACM SIGGRAPH 2004 Course Notes},
- series = "SIGGRAPH '04",
- year = {2004},
- location = {Los Angeles, CA},
- articleno = {11},
- url = {http://doi.acm.org.libproxy.berkeley.edu/10.1145/1103900.1103911},
- doi = {10.1145/1103900.1103911},
- acmid = {1103911},
- publisher = {ACM},
- address = {New York, NY, USA},
-}
-@MISC {1465170,
-  TITLE = {What is the intuition behind matrix splitting methods (Jacobi, Gauss-Seidel)?},
-  AUTHOR = {littleO (https://math.stackexchange.com/users/40119/littleo)},
-  HOWPUBLISHED = {Mathematics Stack Exchange},
-  NOTE = {URL:https://math.stackexchange.com/q/1465170 (version: 2015-10-05)},
-  EPRINT = {https://math.stackexchange.com/q/1465170},
-  URL = {https://math.stackexchange.com/q/1465170}
-}
-@inproceedings{Green2014,
- author = {Green, Simon},
- title = {NVIDIA FlameWorks: Real-time Fire Simulation},
- booktitle = {ACM SIGGRAPH 2014 Computer Animation Festival},
- series = "SIGGRAPH '14",
- year = {2014},
- isbn = {978-1-4503-3054-1},
- location = {Vancouver, Canada},
- pages = {1--1},
- numpages = {1},
- url = {http://doi.acm.org/10.1145/2633956.2658828},
- doi = {10.1145/2633956.2658828},
- acmid = {2658828},
- publisher = {ACM},
- address = {New York, NY, USA},
-}
-@inproceedings{fedkiw2001visual,
-  title={Visual simulation of smoke},
-  author={Fedkiw, Ronald and Stam, Jos and Jensen, Henrik Wann},
-  booktitle={Proceedings of the 28th annual conference on Computer graphics and interactive techniques},
-  pages={15--22},
-  year={2001},
-  organization={ACM}
-}
-@article{steinhoff1994modification,
-  title={Modification of the Euler equations for ‘‘vorticity confinement’’: Application to the computation of interacting vortex rings},
-  author={Steinhoff, John and Underhill, David},
-  journal={Physics of Fluids},
-  volume={6},
-  number={8},
-  pages={2738--2744},
-  year={1994},
-  publisher={AIP}
-}
-@inproceedings{bridson2007curl,
-  title={Curl-noise for procedural fluid flow},
-  author={Bridson, Robert and Houriham, Jim and Nordenstam, Marcus},
-  booktitle={ACM Transactions on Graphics (ToG)},
-  volume={26},
-  number={3},
-  pages={46},
-  year={2007},
-  organization={ACM}
-}
-</script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
-<script>
-    document.addEventListener("DOMContentLoaded", function() {
-        renderMathInElement(document.body);
-    });
-</script>
-<script src="./fire-assets/dist.js"></script>
-</body>
-</html>
+            // Combustion step.
+            temp = combust(temp, fuel);
+
+            // Use vorticity confinement to amplify turbulence of velocity field.
+            curl = computeCurl(u);
+            u = u + confineVorticity(curl, CONFINEMENT);
+
+            // Add thermal buoyancy.
+            u = u + buoyancy(temp);
+
+            // Enforce incompressibility with pressure projection.
+            div = divergence(u);
+            for (let i = 0; i < JACOBI_ITERATIONS; i++) {
+              p = updatePressure(p, div);
+            }
+            u = u - gradient(p);
+
+            // Advect dye through the new velocity field.
+            density = advect(u, density);
+          }
+          </code>
+        </pre>
+      <!-- </dt-code> -->
+    </p>
+    <h3>2.3 Fire Rendering</h3>
+    <p>
+      Fire is a <a href="http://old.cescg.org/CESCG-2000/SMaierhofer/node6.html">participating medium</a>,
+      meaning it emits light through blackbody radiation<dt-fn>Besides emitting its own blackbody radiation, fire also scatters light that passes through it. For more, see
+      5.1 in <a href="http://physbam.stanford.edu/~fedkiw/papers/stanford2002-02.pdf">Nguyen et al. 2002</a>
+      <dt-cite key="nguyen2002physically"></dt-cite>.</dt-fn>. This is what gives fire its orange and red colors;
+      rendering our combusting fuel simulation using the correct formula is then all we need to go from smoke to fire!
+    </p>
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Gluehfarben_no_language_horizontal.svg/2880px-Gluehfarben_no_language_horizontal.svg.png" class="l-middle">
+    <p>
+      <em>The temperature-to-color spectrum as described by Planck's law</em>
+    </p>
+    <p>
+      <a href="https://en.wikipedia.org/wiki/Planck%27s_law">Planck's Law</a> describes the spectral density of light radiated by
+      a black body at a given temperature \( T \):
+
+      $$
+      M(\lambda, T) = \frac{ c_1 }{ \lambda^5 } \frac{ 1 }{ \exp{ \frac{c_2}{\lambda T} } - 1 }
+      $$
+
+      where
+      $$
+      c_1 = 2 \pi h c^2 \\
+      c_2 = \frac{hc}{k}
+      $$
+
+      and \(h\), \(c\), and \(k\) are Planck's constant, the speed of light, and Boltzmann's constant, respectively.
+    </p>
+    <p>
+      After implementing blackbody rendering using fragment shaders, we have a complete fire simulation!
+    </p>
+    <div class="l-middle demo">
+      <div class="demo-canvas-cover">
+        <div class="demo-canvas-cover-button">
+          Click and hold
+        </div>
+      </div>
+      <canvas class="demo-canvas" id="fire-canvas"></canvas>
+    </div>
+    <p>
+      <em>Click and drag to add fire above</em>
+    </p>
+    <p>
+      That's it for these notes! There is of course much more to fluid and fire simulation not covered here, like
+      different (e.g. non-grid-based) techniques for solving the same problem of simulation within a fixed volume,
+      different problems to solve involving varying domains or dynamic obstacles, enhancements to rendering like
+      more accurate blackbody radiation, light scattering, or post-processing effects. Helpful introductions
+      to these topics can be found in references below.
+    </p>
+  </dt-article>
+
+  <dt-appendix>
+  </dt-appendix>
+
+  <script type="text/bibliography">
+  @InBook{Crane07,
+    author = "Crane, Keenan and Llamas, Ignacio, and Tariq, Sarah",
+    title = "Real Time Simulation and Rendering of 3D Fluids",
+    booktitle = "GPUGems 3",
+    editor = "Hubert Nguyen",
+    chapter = "30",
+    publisher = "Addison-Wesley",
+    year = "2007"
+  }
+  @inproceedings{horvath2009directable,
+    title={Directable, high-resolution simulation of fire on the GPU},
+    author={Horvath, Christopher and Geiger, Willi},
+    booktitle={ACM Transactions on Graphics (TOG)},
+    volume={28},
+    number={3},
+    pages={41},
+    year={2009},
+    organization={ACM}
+  }
+  @inproceedings{stam1999stable,
+    title={Stable fluids},
+    author={Stam, Jos},
+    booktitle={Proceedings of the 26th annual conference on Computer graphics and interactive techniques},
+    pages={121--128},
+    year={1999},
+    organization={ACM Press/Addison-Wesley Publishing Co.}
+  }
+  @inproceedings{nguyen2002physically,
+    title={Physically based modeling and animation of fire},
+    author={Nguyen, Duc Quang and Fedkiw, Ronald and Jensen, Henrik Wann},
+    booktitle={ACM Transactions on Graphics (TOG)},
+    volume={21},
+    number={3},
+    pages={721--728},
+    year={2002},
+    organization={ACM}
+  }
+  @inproceedings{harris2005fast,
+    title={Fast fluid dynamics simulation on the GPU.},
+    author={Harris, Mark J},
+    booktitle={SIGGRAPH Courses},
+    pages={220},
+    year={2005},
+    url={http://developer.download.nvidia.com/books/HTML/gpugems/gpugems_ch38.html}
+  }
+  @inproceedings{Aitken:2004:LRV:1103900.1103911,
+   author = {Aitken, Matt and Butler, Greg and Lemmon, Dan and Saindon, Eric and Peters, Dana and Williams, Guy},
+   title = {The Lord of the Rings: The Visual Effects That Brought Middle Earth to the Screen},
+   booktitle = {ACM SIGGRAPH 2004 Course Notes},
+   series = "SIGGRAPH '04",
+   year = {2004},
+   location = {Los Angeles, CA},
+   articleno = {11},
+   url = {http://doi.acm.org.libproxy.berkeley.edu/10.1145/1103900.1103911},
+   doi = {10.1145/1103900.1103911},
+   acmid = {1103911},
+   publisher = {ACM},
+   address = {New York, NY, USA},
+  }
+  @MISC {1465170,
+    TITLE = {What is the intuition behind matrix splitting methods (Jacobi, Gauss-Seidel)?},
+    AUTHOR = {littleO (https://math.stackexchange.com/users/40119/littleo)},
+    HOWPUBLISHED = {Mathematics Stack Exchange},
+    NOTE = {URL:https://math.stackexchange.com/q/1465170 (version: 2015-10-05)},
+    EPRINT = {https://math.stackexchange.com/q/1465170},
+    URL = {https://math.stackexchange.com/q/1465170}
+  }
+  @inproceedings{Green2014,
+   author = {Green, Simon},
+   title = {NVIDIA FlameWorks: Real-time Fire Simulation},
+   booktitle = {ACM SIGGRAPH 2014 Computer Animation Festival},
+   series = "SIGGRAPH '14",
+   year = {2014},
+   isbn = {978-1-4503-3054-1},
+   location = {Vancouver, Canada},
+   pages = {1--1},
+   numpages = {1},
+   url = {http://doi.acm.org/10.1145/2633956.2658828},
+   doi = {10.1145/2633956.2658828},
+   acmid = {2658828},
+   publisher = {ACM},
+   address = {New York, NY, USA},
+  }
+  @inproceedings{fedkiw2001visual,
+    title={Visual simulation of smoke},
+    author={Fedkiw, Ronald and Stam, Jos and Jensen, Henrik Wann},
+    booktitle={Proceedings of the 28th annual conference on Computer graphics and interactive techniques},
+    pages={15--22},
+    year={2001},
+    organization={ACM}
+  }
+  @article{steinhoff1994modification,
+    title={Modification of the Euler equations for ‘‘vorticity confinement’’: Application to the computation of interacting vortex rings},
+    author={Steinhoff, John and Underhill, David},
+    journal={Physics of Fluids},
+    volume={6},
+    number={8},
+    pages={2738--2744},
+    year={1994},
+    publisher={AIP}
+  }
+  @inproceedings{bridson2007curl,
+    title={Curl-noise for procedural fluid flow},
+    author={Bridson, Robert and Houriham, Jim and Nordenstam, Marcus},
+    booktitle={ACM Transactions on Graphics (ToG)},
+    volume={26},
+    number={3},
+    pages={46},
+    year={2007},
+    organization={ACM}
+  }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+  <script>
+      document.addEventListener("DOMContentLoaded", function() {
+          renderMathInElement(document.body);
+      });
+  </script>
+  <script src="./fire-assets/dist.js"></script>
+  </toyb-post>

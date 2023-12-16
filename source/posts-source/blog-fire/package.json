@@ -3,7 +3,7 @@
   "scripts": {
     "build": "esbuild --bundle --sourcemap --loader:.glsl=text --outfile=fire-assets/dist.js --platform=browser main.js",
     "dev": "esbuild --bundle --sourcemap --loader:.glsl=text --outfile=fire-assets/dist.js --platform=browser main.js --servedir=.",
-    "publish": "npm run build && cp fire.html ../../posts/fire.html && cp -r fire-assets ../../posts/fire-assets"
+    "publish": "npm run build && cp fire.html ../../posts/fire.html && rm -rf ../../posts/fire-assets && cp -r fire-assets ../../posts/fire-assets"
   },
   "dependencies": {
     "esbuild": "^0.19.3",
