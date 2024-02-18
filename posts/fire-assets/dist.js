@@ -57,7 +57,7 @@
   var particlesStepLifespan_default = "/*\r\nReduce particle lifespans by dt.\r\n*/\r\n\r\nprecision highp float;\r\nprecision mediump sampler2D;\r\n\r\nvarying vec2 vUv; // for particles, each texel is a separate particle.\r\nuniform float dt;\r\nuniform sampler2D particleLifespans; // texture where each texel color -> (particle lifespan, 0...)\r\n\r\nvoid main () {\r\n  float life = texture2D(particleLifespans, vUv).x;\r\n  gl_FragColor = vec4(life - dt, 0., 0., 1.);\r\n}\r\n";
 
   // shaders/particlesVertexShader.glsl
-  var particlesVertexShader_default = "/*\r\nTransform a particle array texture into an array of vertices to render.\r\n*/\r\n\r\nprecision highp float;\r\nprecision mediump sampler2D;\r\n\r\nuniform sampler2D particleData;\r\nuniform float size;\r\nattribute vec2 particleUV;\r\nvarying vec2 vUv; // each texel maps to its own particle.\r\n\r\nvoid main () {\r\n  vec2 p = texture2D(particleData, particleUV).xy;\r\n  vUv = particleUV;\r\n  gl_PointSize = size;\r\n  gl_Position = vec4(p, 0.0, 1.0);\r\n}\r\n";
+  var particlesVertexShader_default = "/*\r\nTransform a particle array texture into an array of vertices to render.\r\n*/\r\n\r\nprecision highp float;\r\nprecision mediump sampler2D;\r\n\r\nuniform sampler2D particleData;\r\nuniform float size;\r\nattribute vec2 particleUV;\r\nvarying vec2 vUv; // each texel maps to its own particle.\r\n\r\nvoid main () {\r\n  // Scale the coordinates by some factor so that the user doesn't see the\r\n  // boundaries of the box inside which we originally seeded particles.\r\n  vec2 p = texture2D(particleData, particleUV).xy * 1.5;\r\n  vUv = particleUV;\r\n  gl_PointSize = size;\r\n  gl_Position = vec4(p, 0.0, 1.0);\r\n}\r\n";
 
   // shaders/pressureIterationShader.glsl
   var pressureIterationShader_default = "/*\r\nCompute a single Jacobi iteration to approximately solve the Poisson equation\r\nfor pressure.\r\n*/\r\n\r\nprecision highp float;\r\nprecision mediump sampler2D;\r\n\r\nvarying vec2 vUv;\r\nvarying vec2 vL;\r\nvarying vec2 vR;\r\nvarying vec2 vT;\r\nvarying vec2 vB;\r\nuniform sampler2D uPressure;\r\nuniform sampler2D uDivergence;\r\n\r\nvec2 boundary (in vec2 uv) {\r\n  uv = min(max(uv, 0.0), 1.0);\r\n  return uv;\r\n}\r\n\r\nvoid main () {\r\n  float L = texture2D(uPressure, boundary(vL)).x;\r\n  float R = texture2D(uPressure, boundary(vR)).x;\r\n  float T = texture2D(uPressure, boundary(vT)).x;\r\n  float B = texture2D(uPressure, boundary(vB)).x;\r\n  float divergence = texture2D(uDivergence, vUv).x;\r\n  float pressure = (L + R + B + T - divergence) * 0.25;\r\n  gl_FragColor = vec4(pressure, 0.0, 0.0, 1.0);\r\n}\r\n";
@@ -301,7 +301,7 @@
     let config = {
       DYE_RESOLUTION: 1024,
       DENSITY_DISSIPATION: 0.999,
-      PARTICLE_RESOLUTION: 256,
+      PARTICLE_RESOLUTION: 32,
       SIM_RESOLUTION: 1024,
       SPLAT_RADIUS: 0.3
     };
@@ -309,7 +309,8 @@
     let pointers = [new pointerPrototype()];
     let simRes = getResolution(config.SIM_RESOLUTION);
     let dyeRes = getResolution(config.DYE_RESOLUTION);
-    let particleRes = getResolution(config.PARTICLE_RESOLUTION);
+    let particleRes = { width: config.PARTICLE_RESOLUTION, height: config.PARTICLE_RESOLUTION };
+    console.log("makeVelocityFieldSimulation", particleRes);
     let simWidth = simRes.width;
     let simHeight = simRes.height;
     let dyeWidth = dyeRes.width;
@@ -320,7 +321,6 @@
     let velocity;
     let particleData;
     const shaders = {
-      addNoiseShader: compileShader(gl, gl.FRAGMENT_SHADER, addNoiseShader_default),
       advectionManualFilteringShader: compileShader(gl, gl.FRAGMENT_SHADER, advectionManualFilteringShader_default),
       advectionShader: compileShader(gl, gl.FRAGMENT_SHADER, advectionShader_default),
       baseVertexShader: compileShader(gl, gl.VERTEX_SHADER, baseVertexShader_default),
@@ -335,7 +335,6 @@
       shaders.baseVertexShader,
       ext.supportLinearFiltering ? shaders.advectionShader : shaders.advectionManualFilteringShader
     );
-    let addNoiseProgram = new GLProgram(shaders.baseVertexShader, shaders.addNoiseShader);
     let displayProgram = new GLProgram(shaders.baseVertexShader, shaders.displayShader);
     let splatProgram = new GLProgram(shaders.baseVertexShader, shaders.splatShader);
     let velocityFieldProgram = new GLProgram(shaders.baseVertexShader, shaders.circularVelocityFieldShader);
@@ -582,10 +581,12 @@
       for (let i = 0; i < touches.length; i++) {
         let pointer = pointers[i];
         pointer.moved = pointer.down;
-        pointer.dx = (touches[i].pageX - pointer.x) * 8;
-        pointer.dy = (touches[i].pageY - pointer.y) * 8;
-        pointer.x = touches[i].pageX;
-        pointer.y = touches[i].pageY;
+        const offsetX = touches[i].clientX - canvas.getBoundingClientRect().x;
+        const offsetY = touches[i].clientY - canvas.getBoundingClientRect().y;
+        pointer.dx = (offsetX - pointer.x) * 8;
+        pointer.dy = (offsetY - pointer.y) * 8;
+        pointer.x = offsetX;
+        pointer.y = offsetY;
       }
     }, false);
     canvas.addEventListener("mousedown", (e) => {
@@ -601,8 +602,10 @@
         }
         pointers[i].id = touches[i].identifier;
         pointers[i].down = true;
-        pointers[i].x = touches[i].pageX;
-        pointers[i].y = touches[i].pageY;
+        const offsetX = touches[i].clientX - canvas.getBoundingClientRect().x;
+        const offsetY = touches[i].clientY - canvas.getBoundingClientRect().y;
+        pointers[i].x = offsetX;
+        pointers[i].y = offsetY;
       }
     });
     window.addEventListener("mouseup", () => {
@@ -958,10 +961,12 @@
       for (let i = 0; i < touches.length; i++) {
         let pointer = pointers[i];
         pointer.moved = pointer.down;
-        pointer.dx = (touches[i].pageX - pointer.x) * 8;
-        pointer.dy = (touches[i].pageY - pointer.y) * 8;
-        pointer.x = touches[i].pageX;
-        pointer.y = touches[i].pageY;
+        const offsetX = touches[i].clientX - canvas.getBoundingClientRect().x;
+        const offsetY = touches[i].clientY - canvas.getBoundingClientRect().y;
+        pointer.dx = (offsetX - pointer.x) * 8;
+        pointer.dy = (offsetY - pointer.y) * 8;
+        pointer.x = offsetX;
+        pointer.y = offsetY;
       }
     }, false);
     canvas.addEventListener("mousedown", (e) => {
@@ -977,8 +982,10 @@
         }
         pointers[i].id = touches[i].identifier;
         pointers[i].down = true;
-        pointers[i].x = touches[i].pageX;
-        pointers[i].y = touches[i].pageY;
+        const offsetX = touches[i].clientX - canvas.getBoundingClientRect().x;
+        const offsetY = touches[i].clientY - canvas.getBoundingClientRect().y;
+        pointers[i].x = offsetX;
+        pointers[i].y = offsetY;
       }
     });
     window.addEventListener("mouseup", () => {
@@ -1422,10 +1429,12 @@
       for (let i = 0; i < touches.length; i++) {
         let pointer = pointers[i];
         pointer.moved = pointer.down;
-        pointer.dx = (touches[i].pageX - pointer.x) * 8;
-        pointer.dy = (touches[i].pageY - pointer.y) * 8;
-        pointer.x = touches[i].pageX;
-        pointer.y = touches[i].pageY;
+        const offsetX = touches[i].clientX - canvas.getBoundingClientRect().x;
+        const offsetY = touches[i].clientY - canvas.getBoundingClientRect().y;
+        pointer.dx = (offsetX - pointer.x) * 8;
+        pointer.dy = (offsetY - pointer.y) * 8;
+        pointer.x = offsetX;
+        pointer.y = offsetY;
       }
     }, false);
     canvas.addEventListener("mousedown", (e) => {
@@ -1446,8 +1455,10 @@
         }
         pointers[i].id = touches[i].identifier;
         pointers[i].down = true;
-        pointers[i].x = touches[i].pageX;
-        pointers[i].y = touches[i].pageY;
+        const offsetX = touches[i].clientX - canvas.getBoundingClientRect().x;
+        const offsetY = touches[i].clientY - canvas.getBoundingClientRect().y;
+        pointers[i].x = offsetX;
+        pointers[i].y = offsetY;
         pointers[i].color = {
           r: 0.5,
           g: 0.5,
@@ -1983,10 +1994,12 @@
       for (let i = 0; i < touches.length; i++) {
         let pointer = pointers[i];
         pointer.moved = pointer.down;
-        pointer.dx = (touches[i].pageX - pointer.x) * 8;
-        pointer.dy = (touches[i].pageY - pointer.y) * 8;
-        pointer.x = touches[i].pageX;
-        pointer.y = touches[i].pageY;
+        const offsetX = touches[i].clientX - canvas.getBoundingClientRect().x;
+        const offsetY = touches[i].clientY - canvas.getBoundingClientRect().y;
+        pointer.dx = (offsetX - pointer.x) * 8;
+        pointer.dy = (offsetY - pointer.y) * 8;
+        pointer.x = offsetX;
+        pointer.y = offsetY;
       }
     }, false);
     canvas.addEventListener("mousedown", (e) => {
@@ -2007,8 +2020,10 @@
         }
         pointers[i].id = touches[i].identifier;
         pointers[i].down = true;
-        pointers[i].x = touches[i].pageX;
-        pointers[i].y = touches[i].pageY;
+        const offsetX = touches[i].clientX - canvas.getBoundingClientRect().x;
+        const offsetY = touches[i].clientY - canvas.getBoundingClientRect().y;
+        pointers[i].x = offsetX;
+        pointers[i].y = offsetY;
         pointers[i].color = {
           r: 0.5,
           g: 0.5,

@@ -346,7 +346,7 @@ export function makeVelocityFieldSimulation(canvas) {
   let config = {
     DYE_RESOLUTION: 1024,
     DENSITY_DISSIPATION: 0.999,
-    PARTICLE_RESOLUTION: 256,
+    PARTICLE_RESOLUTION: 32,
     SIM_RESOLUTION: 1024,
     SPLAT_RADIUS: 0.3,
   };
@@ -355,7 +355,7 @@ export function makeVelocityFieldSimulation(canvas) {
 
   let simRes = getResolution(config.SIM_RESOLUTION);
   let dyeRes = getResolution(config.DYE_RESOLUTION);
-  let particleRes = getResolution(config.PARTICLE_RESOLUTION);
+  let particleRes = { width: config.PARTICLE_RESOLUTION, height: config.PARTICLE_RESOLUTION };
 
   let simWidth = simRes.width;
   let simHeight = simRes.height;
@@ -369,7 +369,6 @@ export function makeVelocityFieldSimulation(canvas) {
   let particleData;
 
   const shaders = {
-    addNoiseShader: compileShader(gl, gl.FRAGMENT_SHADER, addNoiseShaderSource),
     advectionManualFilteringShader: compileShader(gl, gl.FRAGMENT_SHADER, advectionManualFilteringShaderSource),
     advectionShader: compileShader(gl, gl.FRAGMENT_SHADER, advectionShaderSource),
     baseVertexShader: compileShader(gl, gl.VERTEX_SHADER, baseVertexShaderSource),
@@ -386,7 +385,6 @@ export function makeVelocityFieldSimulation(canvas) {
       shaders.baseVertexShader,
       ext.supportLinearFiltering ? shaders.advectionShader : shaders.advectionManualFilteringShader
     );
-  let addNoiseProgram           = new GLProgram(shaders.baseVertexShader, shaders.addNoiseShader);
   let displayProgram            = new GLProgram(shaders.baseVertexShader, shaders.displayShader);
   let splatProgram              = new GLProgram(shaders.baseVertexShader, shaders.splatShader);
   let velocityFieldProgram      = new GLProgram(shaders.baseVertexShader, shaders.circularVelocityFieldShader);
@@ -683,10 +681,12 @@ export function makeVelocityFieldSimulation(canvas) {
     for (let i = 0; i < touches.length; i++) {
       let pointer = pointers[i];
       pointer.moved = pointer.down;
-      pointer.dx = (touches[i].pageX - pointer.x) * 8.0;
-      pointer.dy = (touches[i].pageY - pointer.y) * 8.0;
-      pointer.x = touches[i].pageX;
-      pointer.y = touches[i].pageY;
+      const offsetX = touches[i].clientX - canvas.getBoundingClientRect().x;
+      const offsetY = touches[i].clientY - canvas.getBoundingClientRect().y;
+      pointer.dx = (offsetX - pointer.x) * 8.0;
+      pointer.dy = (offsetY - pointer.y) * 8.0;
+      pointer.x = offsetX;
+      pointer.y = offsetY;
     }
   }, false);
 
@@ -705,8 +705,10 @@ export function makeVelocityFieldSimulation(canvas) {
 
       pointers[i].id = touches[i].identifier;
       pointers[i].down = true;
-      pointers[i].x = touches[i].pageX;
-      pointers[i].y = touches[i].pageY;
+      const offsetX = touches[i].clientX - canvas.getBoundingClientRect().x;
+      const offsetY = touches[i].clientY - canvas.getBoundingClientRect().y;
+      pointers[i].x = offsetX;
+      pointers[i].y = offsetY;
     }
   });
 
@@ -1132,10 +1134,12 @@ export function makeVorticitySimulation(canvas) {
     for (let i = 0; i < touches.length; i++) {
       let pointer = pointers[i];
       pointer.moved = pointer.down;
-      pointer.dx = (touches[i].pageX - pointer.x) * 8.0;
-      pointer.dy = (touches[i].pageY - pointer.y) * 8.0;
-      pointer.x = touches[i].pageX;
-      pointer.y = touches[i].pageY;
+      const offsetX = touches[i].clientX - canvas.getBoundingClientRect().x;
+      const offsetY = touches[i].clientY - canvas.getBoundingClientRect().y;
+      pointer.dx = (offsetX - pointer.x) * 8.0;
+      pointer.dy = (offsetY - pointer.y) * 8.0;
+      pointer.x = offsetX;
+      pointer.y = offsetY;
     }
   }, false);
 
@@ -1154,8 +1158,10 @@ export function makeVorticitySimulation(canvas) {
 
       pointers[i].id = touches[i].identifier;
       pointers[i].down = true;
-      pointers[i].x = touches[i].pageX;
-      pointers[i].y = touches[i].pageY;
+      const offsetX = touches[i].clientX - canvas.getBoundingClientRect().x;
+      const offsetY = touches[i].clientY - canvas.getBoundingClientRect().y;
+      pointers[i].x = offsetX;
+      pointers[i].y = offsetY;
     }
   });
 
@@ -1684,10 +1690,12 @@ export function makeSmokeSimulation(canvas) {
     for (let i = 0; i < touches.length; i++) {
       let pointer = pointers[i];
       pointer.moved = pointer.down;
-      pointer.dx = (touches[i].pageX - pointer.x) * 8.0;
-      pointer.dy = (touches[i].pageY - pointer.y) * 8.0;
-      pointer.x = touches[i].pageX;
-      pointer.y = touches[i].pageY;
+      const offsetX = touches[i].clientX - canvas.getBoundingClientRect().x;
+      const offsetY = touches[i].clientY - canvas.getBoundingClientRect().y;
+      pointer.dx = (offsetX - pointer.x) * 8.0;
+      pointer.dy = (offsetY - pointer.y) * 8.0;
+      pointer.x = offsetX;
+      pointer.y = offsetY;
     }
   }, false);
 
@@ -1711,8 +1719,10 @@ export function makeSmokeSimulation(canvas) {
 
       pointers[i].id = touches[i].identifier;
       pointers[i].down = true;
-      pointers[i].x = touches[i].pageX;
-      pointers[i].y = touches[i].pageY;
+      const offsetX = touches[i].clientX - canvas.getBoundingClientRect().x;
+      const offsetY = touches[i].clientY - canvas.getBoundingClientRect().y;
+      pointers[i].x = offsetX;
+      pointers[i].y = offsetY;
       pointers[i].color = {
         r: 0.5,
         g: 0.5,
@@ -2337,10 +2347,12 @@ export function makeFireSimulation(canvas) {
     for (let i = 0; i < touches.length; i++) {
       let pointer = pointers[i];
       pointer.moved = pointer.down;
-      pointer.dx = (touches[i].pageX - pointer.x) * 8.0;
-      pointer.dy = (touches[i].pageY - pointer.y) * 8.0;
-      pointer.x = touches[i].pageX;
-      pointer.y = touches[i].pageY;
+      const offsetX = touches[i].clientX - canvas.getBoundingClientRect().x;
+      const offsetY = touches[i].clientY - canvas.getBoundingClientRect().y;
+      pointer.dx = (offsetX - pointer.x) * 8.0;
+      pointer.dy = (offsetY - pointer.y) * 8.0;
+      pointer.x = offsetX;
+      pointer.y = offsetY;
     }
   }, false);
 
@@ -2364,8 +2376,10 @@ export function makeFireSimulation(canvas) {
 
       pointers[i].id = touches[i].identifier;
       pointers[i].down = true;
-      pointers[i].x = touches[i].pageX;
-      pointers[i].y = touches[i].pageY;
+      const offsetX = touches[i].clientX - canvas.getBoundingClientRect().x;
+      const offsetY = touches[i].clientY - canvas.getBoundingClientRect().y;
+      pointers[i].x = offsetX;
+      pointers[i].y = offsetY;
       pointers[i].color = {
         r: 0.5,
         g: 0.5,

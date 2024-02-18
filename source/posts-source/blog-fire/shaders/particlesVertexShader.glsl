@@ -11,7 +11,9 @@ attribute vec2 particleUV;
 varying vec2 vUv; // each texel maps to its own particle.
 
 void main () {
-  vec2 p = texture2D(particleData, particleUV).xy;
+  // Scale the coordinates by some factor so that the user doesn't see the
+  // boundaries of the box inside which we originally seeded particles.
+  vec2 p = texture2D(particleData, particleUV).xy * 1.5;
   vUv = particleUV;
   gl_PointSize = size;
   gl_Position = vec4(p, 0.0, 1.0);

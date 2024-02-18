@@ -30,3 +30,7 @@
 .demo {
   position: relative;
 }
+
+.oversize-width {
+  max-width: 90vw;
+}
