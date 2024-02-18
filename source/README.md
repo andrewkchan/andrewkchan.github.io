@@ -2,7 +2,7 @@ This directory is the source for the blog. It contains:
 - A template for posts in `post.html`
 - A template for the index page in `index.html`
 - A `posts` directory containing post HTML files and any JS scripts or media that they need
-- A `posts-source` directory which I use to write my posts in Typescript + my preferred dev setup before transforming them to HTML + JS + raw media for the `posts` directory.
+- A `posts-source` directory which I use to write my posts in my preferred dev setup before transforming them to HTML + JS + raw media for the `posts` directory.
 
 The posts and template follow the format used by my custom static site generator [toy-blog](https://github.com/andrewkchan/toy-blog).
 

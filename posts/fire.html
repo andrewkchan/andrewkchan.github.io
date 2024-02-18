@@ -755,8 +755,10 @@
             }
             u = u - gradient(p);
 
-            // Advect dye through the new velocity field.
+            // Advect density, fuel, and temperature through the new velocity field.
             density = advect(u, density);
+            temp = advect(u, temp);
+            fuel = advect(u, fuel);
           }
           </code>
         </pre>
