@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "toy-blog-engine": "^0.0.1"
+  },
+  "scripts": {
+    "build": "npm exec toyb -- --index-template ./index.html --post-template ./post.html --posts ./posts --output .."
+  }
+}
