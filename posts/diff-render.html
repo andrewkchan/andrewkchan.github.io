@@ -247,6 +247,13 @@
       Triangles covering the pixel contribute the same color they would for normal rasterization, while other triangles contribute the color
       of their point whose projection is nearest to the pixel in screen-space.
     </p>
+    <div class="l-middle">
+      <img src="./diff-render-assets/soft_rasterizer_gradient_flow.png" style="width: 170px; display: inline-block">
+      <img src="./diff-render-assets/soft_rasterizer_soft_fragment.png" style="width: 400px; display: inline-block">
+      <p class="caption">
+        <i>Figures from <dt-cite key="Liu_2019_ICCV"></dt-cite>. Left: how gradients flow from occluded and un-covered triangles to pixels. Right: how the soft-fragment value is determined for the region around a triangle in screen space.</i>
+      </p>
+    </div>
     <p>
       The probability \( w_i \) is interesting. One can view the sampling operation as a “hard” probability where the closest triangle covering
       the pixel has a probability of 1 and all others have probability zero. This "winner-take-all" operation has a differentiable generalization
@@ -275,7 +282,7 @@
         <li>
           <p>
             \( D_i(\mathbf{p})=\text{sigmoid}(\text{sgn}_i(\mathbf{p})\frac{d_i(\mathbf{p})^2}{\sigma}) \) is a “soft fragment” value which gives a number (0, 1) depending on the
-            distance of the pixel from the center of the triangle (higher towards the center).
+            distance of the pixel from the center of the triangle in screen space (higher towards the center).
           </p>
           <ul>
             <li>
@@ -376,10 +383,12 @@
     <p>
       Python-only implementations of either of these renderers are very slow. Basic optimizations like vectorizing some calculations and culling triangles outside of the soft renderer's
       blur radius threshold by bounding box with quad trees help, but the lack of proper parallelism hurts a lot since the work to do scales very quickly with screen dimensions.
-      Dynamically re-building the computation graph and back-propagating through it is expensive as well. Production implementations instead manually compute the forward and backwards
-      passes, which avoids the overhead of auto-grad but is difficult to read and write. Additionally they tend use either C++ (where better parallelism can be achieved with threads as
-      well as all the other benefits of statically compiled code with more control over memory layout) or CUDA (far better parallelism by actually leveraging the GPU for rendering, as it's
-      intended to be used).
+      Dynamically re-building the computation graph and back-propagating through it is expensive as well. <a href="https://github.com/facebookresearch/pytorch3d">Production</a>
+      <a href="https://github.com/tensorflow/graphics">implementations</a> instead manually compute the forward and backwards
+      passes, which avoids the overhead of auto-grad but is difficult to read and write. Additionally they tend use either <a href="https://pytorch.org/tutorials/advanced/cpp_extension.html">C++</a>
+      (where better parallelism can be achieved with threads as well as all the other benefits of statically compiled code with more control over memory layout) or
+      <a href="https://pytorch.org/tutorials/advanced/cpp_extension.html#writing-a-mixed-c-cuda-extension">CUDA</a> (far better parallelism by
+      actually leveraging the GPU for rendering, as it's intended to be used).
     </p>
     <p>
       Performing 1000 optimization steps to fit a 402-vertex mesh to three 96x96 target views took a little less than 5 CPU-hours (7 hours wall-clock time) on my M3 MacBook Pro using my
