@@ -95,6 +95,7 @@
       The key non-differentiable operation is the sampling operation: the part where we have to choose which triangle contributes to a
       given pixel (or decide that the pixel isn't covered by any triangle).
     </p>
+    <img src="./diff-render-assets/rasterization.png" class="l-middle" alt="Traditional rasterization diagram" style="max-width: 800px">
     <p>
       In more detail, to render a mesh with vertex positions and texture attributes, camera parameters, and lights, we:
       </p><ol>
@@ -156,7 +157,8 @@
       The assumption that the triangle covering a pixel does not change for small perturbations in rendering parameters is highly limiting.
     </p>
     <p>
-      First, it means we can't handle color cliffs. We're effectively assuming that vertex attributes smoothly vary between adjacent triangles and are locally planar<dt-cite key="Genova_2018_CVPR"></dt-cite>
+      First, it means we can't handle color cliffs. We're effectively assuming that vertex attributes smoothly vary between adjacent triangles and are locally planar
+      <dt-fn>See the description of this differentiable renderer formulation in <dt-cite key="Genova_2018_CVPR"></dt-cite>.</dt-fn>
       (that's what we'd get by extrapolating attributes outside triangles using un-clipped barycentrics).
     </p>
     <ul>
