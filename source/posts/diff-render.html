@@ -74,7 +74,7 @@
       The key non-differentiable operation is the sampling operation: the part where we have to choose which triangle contributes to a
       given pixel (or decide that the pixel isn't covered by any triangle).
     </p>
-    <img src="./diff-render-assets/rasterization.png" class="l-middle" alt="Traditional rasterization diagram" style="max-width: 800px">
+    <img src="./diff-render-assets/rasterization.png" class="l-middle" alt="Traditional rasterization diagram" style="max-width: 90vw;">
     <p>
       In more detail, to render a mesh with vertex positions and texture attributes, camera parameters, and lights, we:
       <ol>
@@ -129,7 +129,7 @@
     </p>
     <h3>Problems</h3>
     <div class="l-middle">
-      <img src="./diff-render-assets/discontinuities.png" alt="Rendering discontinuities" style="max-width: 600px">
+      <img src="./diff-render-assets/discontinuities.png" alt="Rendering discontinuities" style="max-width: 90vw;">
       <p class="caption"><i>Image from <dt-cite key="ravi2020accelerating"></dt-cite>. As we'll see below, a softer formulation of rendering can fix these discontinuities.</i></p>
     </div>
     <p>
@@ -200,7 +200,7 @@
       requires a more complex multi-layer rendering scheme to handle Z-discontinuities.</dt-fn>
     </p>
     <div class="l-middle">
-      <img src="./diff-render-assets/soft-rasterizer.png" alt="Soft rasterizer diagram" style="max-width: 800px">
+      <img src="./diff-render-assets/soft-rasterizer.png" alt="Soft rasterizer diagram" style="max-width: 90vw;">
       <p class="caption"><i>Diagram from <dt-cite key="Liu_2019_ICCV"></dt-cite>.</i></p>
     </div>
     <p>
@@ -229,8 +229,8 @@
       of their point whose projection is nearest to the pixel in screen-space.
     </p>
     <div class="l-middle">
-      <img src="./diff-render-assets/soft_rasterizer_gradient_flow.png" style="width: 170px; display: inline-block">
-      <img src="./diff-render-assets/soft_rasterizer_soft_fragment.png" style="width: 400px; display: inline-block">
+      <img src="./diff-render-assets/soft_rasterizer_gradient_flow.png" style="max-width: 25vw; display: inline-block">
+      <img src="./diff-render-assets/soft_rasterizer_soft_fragment.png" style="max-width: 50vw; display: inline-block">
       <p class="caption">
         <i>Figures from <dt-cite key="Liu_2019_ICCV"></dt-cite>. Left: how gradients flow from occluded and un-covered triangles to pixels. Right: how the soft-fragment value is determined for the region around a triangle in screen space.</i>
       </p>
@@ -351,9 +351,9 @@ def rasterize(vertices, triangles, attributes, image_width, image_height):
       to the views using gradient descent:
     </p>
     <div class="l-middle">
-      <img src="./diff-render-assets/cow_view1.png" alt="Front view of the cow" style="width: 200px; display: inline-block">
-      <img src="./diff-render-assets/cow_view2.png" alt="First side view of the cow" style="width: 200px; display: inline-block">
-      <img src="./diff-render-assets/cow_view3.png" alt="Second side view of the cow" style="width: 200px; display: inline-block">
+      <img src="./diff-render-assets/cow_view1.png" alt="Front view of the cow" style="width: 25vw; max-width: 200px; display: inline-block">
+      <img src="./diff-render-assets/cow_view2.png" alt="First side view of the cow" style="width: 25vw; max-width: 200px; display: inline-block">
+      <img src="./diff-render-assets/cow_view3.png" alt="Second side view of the cow" style="width: 25vw; max-width: 200px; display: inline-block">
     </div>
     <div class="l-middle">
       <video src="./diff-render-assets/fitted_cow_mesh.mp4" controls style="width: 320px; display: inline-block"></video>
