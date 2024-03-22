@@ -342,8 +342,7 @@ def rasterize(vertices, triangles, attributes, image_width, image_height):
     <div class="l-middle">
       <video src="./diff-render-assets/teapot_45deg_soft.mp4" controls style="min-width: 320px; max-width: 400px; display: inline-block"></video>
       <img src="./diff-render-assets/teapot_45deg_soft_loss.png" alt="Optimization loss of the teapot at 45 degrees with soft renderer" style="max-width: 400px; display: inline-block">
-      <p class="caption"><i>This optimization was performed using lower-resolution renders because I didn't get around to implementing an optimized C++ kernel for my soft renderer,
-        so the optimization video is also lower quality.</i></p>
+      <p class="caption"><i>This optimization was performed using lower-resolution renders because I didn't get around to implementing an optimized C++ kernel for my soft renderer.</i></p>
     </div>
     <p>
       I was also able to fit meshes with my soft renderer. Below, I fit a 402-vertex sphere mesh to three 96x96 views of a much higher poly cow mesh by minimizing silhouette loss
@@ -357,6 +356,7 @@ def rasterize(vertices, triangles, attributes, image_width, image_height):
     <div class="l-middle">
       <video src="./diff-render-assets/fitted_cow_mesh.mp4" controls style="width: 320px; display: inline-block"></video>
       <img src="./diff-render-assets/fitted_cow_mesh.png" style="width: 341px; display: inline-block">
+      <p class="caption"><i>My implementation isn't well calibrated so the result is low-quality. See the <a href="https://pytorch3d.org/tutorials/fit_textured_mesh">PyTorch3D mesh fitting tutorial</a> for an example of a higher-quality fit.</i></p>
     </div>
 
     <h2>What are the limitations?</h2>
