@@ -136,7 +136,8 @@
     </p>
     <p>
       First, it means we can't handle color cliffs. We're effectively assuming that vertex attributes smoothly vary between adjacent triangles and are locally planar
-      (that's what we'd get by extrapolating attributes outside triangles using barycentrics).
+      <dt-fn>See the description of this differentiable renderer formulation in <dt-cite key="Genova_2018_CVPR"></dt-cite>.</dt-fn>
+      (that's what we'd get by extrapolating attributes outside triangles using un-clipped barycentrics).
     </p>
     <ul>
       <li>
