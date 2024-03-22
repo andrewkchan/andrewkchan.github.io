@@ -1,0 +1,466 @@
+<toyb-post>
+  <toyb-title>Differentiable Mesh Rendering</toyb-title>
+  <toyb-date>March 21 2024</toyb-date>
+  <toyb-head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-HYB0C59DXR');
+    </script>
+
+    <script type="text/front-matter">
+      title: "Differentiable Mesh Rendering"
+      description: "Notes on approaches to differentiable rendering of meshes and what we can do with them."
+      authors:
+      - Andrew Chan: http://andrewkchan.github.io
+      affiliations:
+      -
+    </script>
+
+    <style>
+      .caption > i {
+        font-size: 15px;
+        line-height: 1.3em;
+      }
+    </style>
+  </toyb-head>
+  <dt-article>
+    <h1>Differentiable mesh rendering</h1>
+    <h2>Notes on approaches to differentiable rendering of meshes and what we can do with them.</h2>
+    <dt-byline></dt-byline>
+    <p>
+      I recently dove into differentiable rendering. This is an interesting technology which allows you to render
+      a scene, then obtain derivatives of the output pixel values with respect to your continuous inputs:
+      rendering primitives, camera intrinsics, lighting, texture values, etc. It has applications in 3D deep learning
+      and inverse rendering, including specific tasks like pose estimation, automatic texturing, or reconstructing scene
+      geometry or camera parameters given an image<dt-cite key="Kato_2018_CVPR"></dt-cite><dt-cite key="bhaskara2022differentiable"></dt-cite><dt-cite key="ravi2020accelerating"></dt-cite>.
+    </p>
+    <p>
+      This article will focus on differentiable mesh rendering, specifically mesh rasterization. Meshes haven't been as
+      popular as neural radiance fields<dt-cite key="mildenhall2020nerf"></dt-cite> or gaussian splats<dt-cite key="kerbl20233d"></dt-cite> recently.
+      These are other types of 3D primitives which also leverage differentiable rendering that have been hot in computer graphics research, because
+      recent advances have made it easier to reconstruct them from 2D images and get higher quality novel views than with meshes.<dt-fn>See
+      <a href="https://edwardahn.me/writing/NeRFvs3DGS">this blog post from Edward Ahn</a> for a great introduction.</dt-fn>
+    </p>
+    <p>
+      However, meshes are still more or less needed to make a practical 3D application at scale today. This is because so much of
+      the modern graphics pipeline - hardware and software - is optimized around rasterization of triangle meshes. Lighting and
+      animation of meshes is also more developed than with other primitives, and artists are more used to working with them.
+    </p>
+    <p>
+      So there is lots of interest in mesh reconstruction, and in differentiable mesh rendering because the technology could
+      more directly attack the task of producing 3D meshes from 2D images.
+    </p>
+
+    <h2>What do we need to make rendering differentiable?</h2>
+    <p>
+      Consider a single pixel in a rendered image. We'd like to obtain a derivative of the pixel color with respect to all the rendering
+      inputs, like mesh vertex positions, texture attributes, camera parameters, and lights.
+    </p>
+    <p>
+      Fundamentally, rendering is almost entirely a series of straightforward, differentiable operations on floating-point inputs: we
+      multiply vertex positions by a series of matrices and perform some divisions to project triangle vertices from 3D to 2D, then when
+      considering a single triangle's contribution to a pixel, we do more matrix multiplications and divisions (and maybe some dot products
+      if lighting is involved) to get the final color of the pixel.
+    </p>
+    <p>
+      The key non-differentiable operation is the sampling operation: the part where we have to choose which triangle contributes to a
+      given pixel (or decide that the pixel isn't covered by any triangle).
+    </p>
+    <p>
+      In more detail, to render a mesh with vertex positions and texture attributes, camera parameters, and lights, we:
+      <ol>
+        <li>
+          <a href="https://www.songho.ca/opengl/gl_transform.html">Transform the vertices</a> from world space to a coordinate frame relative to the camera.
+          This is done via multiplying the vertex positions by a matrix whose entries are determined by the camera parameters.
+        </li>
+        <li>
+          Perform <a href="https://www.songho.ca/opengl/gl_projectionmatrix.html#perspective">perspective projection</a> on the clip space vertices.
+          This transforms 3D points into 2D points by projecting them onto the image plane.
+          Mathematically, this involves dividing every point by the point's depth component.
+        </li>
+        <li>
+          <p>
+            For every pixel, determine whether it is inside a triangle. If so, then determine where the ray from the pixel hits the triangle in 3D, and
+            interpolate the attributes of the triangle vertices accordingly to get its color. If the 3D intersection point of some triangle is closer to
+            the camera than that of any other triangle, it becomes the final color of the pixel.
+          </p>
+          <ul>
+            <li>
+              Mathematically, this involves multiplying a vector corresponding to the pixel center by a matrix whose entries depend on the triangle's vertex
+              positions, then maybe (if the pixel is inside) dividing by the vertex depths and using the resulting
+              <a href="https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/rasterization-stage.html#:~:text=or%20the%20other.-,Barycentric%20Coordinates,-Figure%2011%3A">barycentric coordinates</a>
+              to interpolate vertex attributes and possibly computing lighting with dot products.
+            </li>
+            <li>
+              This is where the non-differentiable sampling operation takes place. We have to first determine whether a pixel is covered by a triangle at all,
+              and then pick which triangle to use by taking the one closest to the camera (the other triangles are <i>occluded</i>).
+            </li>
+          </ul>
+        </li>
+      </ol>
+    </p>
+
+    <h2>A Naive Approach</h2>
+    <p>
+      <em><a href="https://github.com/andrewkchan/pytorch_mesh_renderer/tree/master/src/mesh_renderer">Source code for my mesh_renderer implementation on GitHub.</a></em>
+    </p>
+    <p>
+      First, we can examine a naive approach to rendering which ignores the sampling discontinuity. That is, assume for any given pixel, the triangle
+      contributing to that pixel does not change.
+    </p>
+    <p>
+      This is easy to implement with PyTorch (and most modern differentiable programming frameworks), which allows for discontinuous operations like
+      branching and array indexing to select different real-valued outputs. Since PyTorch constructs a new computation graph for each run of a function, taking
+      the derivative of the result with <dt-code language="python">result.backward()</dt-code> will just flow gradients back to whatever inputs happened to be involved in the most recent run.
+    </p>
+    <p>
+      So for our differentiable renderer, if we implement it just like a normal renderer, treating PyTorch as a fancy linear algebra library - for any given pixel, we'll
+      obtain the derivative of its color with respect to the triangle that happened to be covering it (and any relevant texture attributes, lighting parameters, etc.) in
+      the latest render.
+    </p>
+    <h3>Problems</h3>
+    <div class="l-middle">
+      <img src="./diff-render-assets/discontinuities.png" alt="Rendering discontinuities" style="max-width: 600px">
+      <p class="caption"><i>Image from <dt-cite key="ravi2020accelerating"></dt-cite>. As we'll see below, a softer formulation of rendering can fix these discontinuities.</i></p>
+    </div>
+    <p>
+      The assumption that the triangle covering a pixel does not change for small perturbations in rendering parameters is highly limiting.
+    </p>
+    <p>
+      First, it means we can't handle color cliffs. We're effectively assuming that vertex attributes smoothly vary between adjacent triangles and are locally planar
+      (that's what we'd get by extrapolating attributes outside triangles using barycentrics).
+    </p>
+    <ul>
+      <li>
+      There are some scenarios where this makes sense. For example, consider a finely tessellated rectangle mapped to a UV-domain in [0, 1], textured with a
+      linear gradient from white on the left to black on the right. The gradient of color for a pixel in the center of the rectangle will push the pixel to the
+      right (or conversely translate the rectangle to the left).
+      </li>
+      <li>
+      But many textures do not have smoothly varying values. For example, consider the same finely tessellated rectangle with a black-and-white checkerboard texture.
+      A pixel in a white square would not have the correct gradient unless it was in a triangle intersecting both white and black squares.
+      </li>
+    </ul>
+    <p>
+      Second, it means we only obtain gradients for pixels that are covered. If we have a solid color triangle and we want to reduce the rendering loss to an image of the
+      same triangle translated to the side so there is no overlap, our naive renderer won't help because it won't provide any gradients with respect to the target pixels.
+    </p>
+    <p>
+      Finally, we're unable to obtain gradients for occluded elements. So if a red triangle is behind a blue triangle but we'd like to make a pixel red by optimizing the
+      depths of our triangles, we're unable to do so.
+    </p>
+    <h3>Results</h3>
+    <p>
+      That said, this approach does provide workable gradients for some simple tasks.
+
+      For example, we're able to optimize a cube's rotation via gradient descent to minimize the RGB loss against an image of the same cube with a target rotation:
+    </p>
+
+    <div class="l-middle">
+      <video src="./diff-render-assets/cube-rotation.mp4" controls style="max-width: 400px; display: inline-block"></video>
+      <img src="./diff-render-assets/cube_rotation_loss.png" alt="Optimization loss of the cube rotation" style="max-width: 400px; display: inline-block">
+    </div>
+    <p>
+      We can do the same thing for more complex meshes too. For example, given a 2k vertex teapot mesh, we're able to optimize the teapot's roll angle from
+      0 to 30 degrees using the same method.
+    </p>
+    <div class="l-middle">
+      <video src="./diff-render-assets/teapot_60deg.mp4" controls style="max-width: 400px; display: inline-block"></video>
+      <img src="./diff-render-assets/teapot_60deg_loss.png" alt="Optimization loss of the teapot at 60 degrees" style="max-width: 400px; display: inline-block">
+    </div>
+    <p>
+      But the range that converges is limited. When the target render sets a 45 degree teapot roll, the optimization fails to converge:
+    </p>
+    <div class="l-middle">
+      <video src="./diff-render-assets/teapot_45deg.mp4" controls style="max-width: 400px; display: inline-block"></video>
+      <img src="./diff-render-assets/teapot_45deg_loss.png" alt="Optimization loss of the teapot at 45 degrees" style="max-width: 400px; display: inline-block">
+    </div>
+
+    <h2>A Softer Approach</h2>
+    <p>
+      <em><a href="https://github.com/andrewkchan/pytorch_mesh_renderer/tree/master/src/soft_mesh_renderer">Source code for my soft_mesh_renderer implementation on GitHub.</a></em>
+    </p>
+    <p>
+      A better approach is to formulate rendering as a “soft” process<dt-cite key="Liu_2019_ICCV"></dt-cite> where all triangles have some probability
+      of contributing to a given pixel (triangles closer to the pixel have higher probability), and the sampling output is a sum of triangle contributions
+      to a pixel weighted by probability.
+      This is the approach used by PyTorch3D<dt-cite key="ravi2020accelerating"></dt-cite>, one of the most popular differentiable rendering packages today.
+      <dt-fn>Another approach that fixes the sampling discontinuity is rasterize-then-splat<dt-cite key="Cole_2021_ICCV"></dt-cite>, an algorithm used by
+      TensorFlow Graphics<dt-cite key="10.1145/3305366.3328041"></dt-cite> which bolts on an additional blurring pass to a naive rasterizer, but which
+      requires a more complex multi-layer rendering scheme to handle Z-discontinuities.</dt-fn>
+    </p>
+    <div class="l-middle">
+      <img src="./diff-render-assets/soft-rasterizer.png" alt="Soft rasterizer diagram" style="max-width: 800px">
+      <p class="caption"><i>Diagram from <dt-cite key="Liu_2019_ICCV"></dt-cite>.</i></p>
+    </div>
+    <p>
+      Mathematically, the color of a pixel \( \mathbf{I}(\mathbf{p}) \) is given by
+
+      $$
+      \mathbf{I}(\mathbf{p}) = w_bC_b + \displaystyle\sum_{i}{w_i(\mathbf{p})C_i(\mathbf{p})}
+      $$
+    </p>
+    <p>
+      where
+      <ul>
+        <li>
+          \( C_i(\mathbf{p}) \) is the color contributed by triangle \( i \) to pixel \( \mathbf{p} \).
+        </li>
+        <li>
+          The weights \( w_i \) are the probabilities of the triangles and satisfy \( \sum_i{w_i(\mathbf{p})}=1 \).
+        </li>
+        <li>
+          \( w_bC_b \) is the background color contribution.
+        </li>
+      </ul>
+    </p>
+    <p>
+      Triangles covering the pixel contribute the same color they would for normal rasterization, while other triangles contribute the color
+      of their point whose projection is nearest to the pixel in screen-space.
+    </p>
+    <p>
+      The probability \( w_i \) is interesting. One can view the sampling operation as a “hard” probability where the closest triangle covering
+      the pixel has a probability of 1 and all others have probability zero. This "winner-take-all" operation has a differentiable generalization
+      used in machine learning: the <a href="https://en.wikipedia.org/wiki/Softmax_function">softmax function</a>! \( w_i \) looks a lot like softmax:
+
+      $$
+      \displaystyle w_i(\mathbf{p}) =
+      \frac{D_i(\mathbf{p})\text{exp}(\frac{z_i(\mathbf{p})}{\gamma})}{\text{exp}(\frac{\epsilon}{\gamma}) + \sum_j{D_j(\mathbf{p})\text{exp}(\frac{z_j(\mathbf{p})}{\gamma})}}
+      $$
+
+      where
+
+      <ul>
+        <li>
+          <p>
+            \( z_i(\mathbf{p}) \) gives how far the nearest 3D point on the triangle is from the viewing frustum's far plane. It's like depth, except 0 means the point is as
+            far as possible (lies in the far plane) and 1 means the point is as close as possible (lies in the near plane). Notice how if we hold the other terms constant, the
+            probability output is very similar to the z-buffering operation.
+          </p>
+          <ul>
+            <li>
+              \( \epsilon \) is there to give the background color a little bit of probability.
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p>
+            \( D_i(\mathbf{p})=\text{sigmoid}(\text{sgn}_i(\mathbf{p})\frac{d_i(\mathbf{p})^2}{\sigma}) \) is a “soft fragment” value which gives a number (0, 1) depending on the
+            distance of the pixel from the center of the triangle (higher towards the center).
+          </p>
+          <ul>
+            <li>
+              It's a sigmoid so it falls off really quickly outside of the triangle (as determined by \( \sigma \)), but is still differentiable everywhere. See the paper for more
+              details on the terms.
+            </li>
+            <li>
+              Notice this modulates all the depth exponential terms except for the background color term. The idea is “pick the closest triangle in depth, but only weigh it more
+              than the background color if it's close enough to the pixel in screen space.”
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </p>
+    <p>
+      Since all functions above are differentiable, gradients can flow from the output color back to any of the inputs (mesh vertices, attributes, lighting, camera). And since soft
+      rendering approaches hard rendering in the limit, the optimum of a loss function incorporating it should be approximately equal to the optimum of the hard renderer, too.
+    </p>
+    <p>
+      Overall, the process is a bit like rendering a blurred version of the normal image, except we're also blurring in the z-component and the formulation is independent of screen size,
+      so we don't need to pick a blur kernel size (although in practice, implementations like PyTorch3D will limit aggregation to triangles within a given blur radius hyper-parameter).
+    </p>
+
+    <h3>How well does it work?</h3>
+    <p>The soft renderer works much better. Cases that the naive renderer doesn't provide gradients for are handled robustly by the soft rendering formulation.</p>
+    <p>
+      It can handle color cliffs across adjacent triangles because we get gradients from those triangles. So for a tessellated rectangle divided into a black half and white
+      half, the gradient of intensity for a pixel in the black half would push the pixel towards the white half, even if it was in a triangle whose vertices were all black.
+    </p>
+    <p>
+      Uncovered pixels also get gradients from triangles. So the renderer is able to push triangles to previously un-covered areas of the screen via gradient descent. Occluded
+      triangles can also be similarly moved to the front.
+    </p>
+    <p>
+      For the teapot rotation example earlier, my soft differentiable renderer implementation is able to handle the 45-degree roll angle that my naive renderer couldn't:
+    </p>
+    <div class="l-middle">
+      <video src="./diff-render-assets/teapot_45deg_soft.mp4" controls style="min-width: 320px; max-width: 400px; display: inline-block"></video>
+      <img src="./diff-render-assets/teapot_45deg_soft_loss.png" alt="Optimization loss of the teapot at 45 degrees with soft renderer" style="max-width: 400px; display: inline-block">
+      <p class="caption"><i>This optimization was performed using lower-resolution renders because I didn't get around to implementing an optimized C++ kernel for my soft renderer,
+        so the optimization video is also lower quality.</i></p>
+    </div>
+    <p>
+      I was also able to fit meshes with my soft renderer. Below, I fit a 402-vertex sphere mesh to three 96x96 views of a much higher poly cow mesh by minimizing silhouette loss
+      to the views using gradient descent:
+    </p>
+    <div class="l-middle">
+      <img src="./diff-render-assets/cow_view1.png" alt="Front view of the cow" style="width: 200px; display: inline-block">
+      <img src="./diff-render-assets/cow_view2.png" alt="First side view of the cow" style="width: 200px; display: inline-block">
+      <img src="./diff-render-assets/cow_view3.png" alt="Second side view of the cow" style="width: 200px; display: inline-block">
+    </div>
+    <div class="l-middle">
+      <video src="./diff-render-assets/fitted_cow_mesh.mp4" controls style="width: 320px; display: inline-block"></video>
+      <img src="./diff-render-assets/fitted_cow_mesh.png" style="width: 341px; display: inline-block">
+    </div>
+
+    <h2>What are the limitations?</h2>
+    <p>
+      Mesh fitting via differentiable rendering requires specific input. The topology is fixed and must be provided by the user, the camera poses must be known, and the images
+      must be masked so that only the objects of interest contribute loss. This means differentiable rendering and gradient descent alone probably aren't general enough for
+      most ad-hoc real-world 3D reconstruction use cases.
+    </p>
+    <p>
+      For example, if you want to build something like an app where you can use your phone to take a few pictures of something on your desk and get a usable 3D mesh out of it,
+      you'd need to use structure from motion techniques and image segmentation to get the poses and masking. Though on the other hand many household objects could be acceptably
+      fit with a spherical mesh.
+    </p>
+    <p>
+      Additionally, the mesh fitting process needs some manual supervision and requires either a GPU or lots of time to get high-quality outputs.
+    </p>
+    <p>
+      Fitting meshes with a non-trivial number of vertices required thousands of gradient descent steps for me (though this can be made pretty fast if accelerated via GPGPU -
+      see implementation notes below), and the optimization process was somewhat sensitive to hyper-parameters like learning rate, blur radius, and soft aggregation sigma/gamma.
+      Regularization using extra terms like <a href="https://en.wikipedia.org/wiki/Laplacian_smoothing">laplacian</a> and edge length loss was also necessary to get good
+      convergence and avoid failure cases where the mesh would end up discontinuous and “spiky”.<dt-fn>See <dt-cite key="Wang_2018_ECCV"></dt-cite> for definitions of these terms.</dt-fn>
+    </p>
+
+    <h2>What can we use this for?</h2>
+    <p>
+      The biggest use case is to enable deep learning to be used on tasks that involve going from 2D images to 3D meshes.
+      For instance, a popular research topic is how we might train a model to take in a single 2D image and output a 3D mesh: that is, how we might solve single-image 3D reconstruction
+      with machine learning methods that learn how 2D images correspond to the most common objects in the real world. We can train such a model using 3D supervision (e.g. 3D mesh labels
+      for each 2D image input), but there is only so much 3D data out there and it's not clear how we'd define loss if the model generates a mesh with a different topology than the label.
+      With differentiable rendering, we can train a network using only 2D supervision; given an image, the model can output some mesh, and the differentiable renderer can render it and
+      back-propagate image RGB loss through the mesh vertices.
+    </p>
+    <p>
+      We can extend this to tasks which involve predicting parameters that influence the appearance of some object in 3D again given only 2D supervision. For example, a “3D morphable model”
+      is a popular way to parameterize a human face with a set of sliders. Given a set of face images, we can train a model to predict the values of these sliders by back-propagating facial
+      identity loss through the rendered images.<dt-fn>See <dt-cite key="Genova_2018_CVPR"></dt-cite> which found the naive formulation sufficient to train a neural network to preduct 3DMM parameters.</dt-fn>
+      This technique is called “analysis-by-synthesis”.
+    </p>
+
+    <h2>Implementation notes</h2>
+    <p>
+      <em>Source code for the renderers can be found on <a href="https://github.com/andrewkchan/pytorch_mesh_renderer">my GitHub</a>.</em>
+    </p>
+    <p>
+      Python-only implementations of either of these renderers are very slow. Basic optimizations like vectorizing some calculations and culling triangles outside of the soft renderer's
+      blur radius threshold by bounding box with quad trees help, but the lack of proper parallelism hurts a lot since the work to do scales very quickly with screen dimensions.
+      Dynamically re-building the computation graph and back-propagating through it is expensive as well. Production implementations instead manually compute the forward and backwards
+      passes, which avoids the overhead of auto-grad but is difficult to read and write. Additionally they tend use either C++ (where better parallelism can be achieved with threads as
+      well as all the other benefits of statically compiled code with more control over memory layout) or CUDA (far better parallelism by actually leveraging the GPU for rendering, as it's
+      intended to be used).
+    </p>
+    <p>
+      Performing 1000 optimization steps to fit a 402-vertex mesh to three 96x96 target views took a little less than 5 CPU-hours (7 hours wall-clock time) on my M3 MacBook Pro using my
+      Python-only soft renderer implementation. In contrast, PyTorch3D's C++ soft renderer was able to fit a 2562-vertex mesh (over 6 times as many vertices) to the same images in even less
+      time: 3 CPU-hours on my laptop. PyTorch3D's own online mesh fitting tutorials which leverage Google Colab machines with CUDA only take a few minutes to do something similar!
+    </p>
+  </dt-article>
+
+  <dt-appendix>
+  </dt-appendix>
+
+  <script type="text/bibliography">
+    @InProceedings{Kato_2018_CVPR,
+      author = {Kato, Hiroharu and Ushiku, Yoshitaka and Harada, Tatsuya},
+      title = {Neural 3D Mesh Renderer},
+      booktitle = {Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+      month = {June},
+      year = {2018}
+    }
+    @misc{bhaskara2022differentiable,
+      title={Differentiable Rendering for Pose Estimation in Proximity Operations},
+      author={Ramchander Rao Bhaskara and Roshan Thomas Eapen and Manoranjan Majji},
+      year={2022},
+      eprint={2212.12668},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+    }
+    @misc{mildenhall2020nerf,
+      title={NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis},
+      author={Ben Mildenhall and Pratul P. Srinivasan and Matthew Tancik and Jonathan T. Barron and Ravi Ramamoorthi and Ren Ng},
+      year={2020},
+      eprint={2003.08934},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+    }
+    @article{kerbl20233d,
+      title={3d gaussian splatting for real-time radiance field rendering},
+      author={Kerbl, Bernhard and Kopanas, Georgios and Leimk{\"u}hler, Thomas and Drettakis, George},
+      journal={ACM Transactions on Graphics},
+      volume={42},
+      number={4},
+      pages={1--14},
+      year={2023},
+      publisher={ACM}
+    }
+    @InProceedings{Genova_2018_CVPR,
+      author = {Genova, Kyle and Cole, Forrester and Maschinot, Aaron and Sarna, Aaron and Vlasic, Daniel and Freeman, William T.},
+      title = {Unsupervised Training for 3D Morphable Model Regression},
+      booktitle = {Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+      month = {June},
+      year = {2018}
+    }
+    @InProceedings{Liu_2019_ICCV,
+      author = {Liu, Shichen and Li, Tianye and Chen, Weikai and Li, Hao},
+      title = {Soft Rasterizer: A Differentiable Renderer for Image-Based 3D Reasoning},
+      booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+      month = {October},
+      year = {2019}
+    }
+    @misc{ravi2020accelerating,
+      title={Accelerating 3D Deep Learning with PyTorch3D},
+      author={Nikhila Ravi and Jeremy Reizenstein and David Novotny and Taylor Gordon and Wan-Yen Lo and Justin Johnson and Georgia Gkioxari},
+      year={2020},
+      eprint={2007.08501},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+    }
+    @inproceedings{10.1145/3305366.3328041,
+      author = {Bailey, Paige and Bouaziz, Sofien and Carter, Shan and Gordon, Josh and H\"{a}ne, Christian and Mordvintsev, Alexander and Valentin, Julien and Wicke, Martin},
+      title = {Differentiable graphics with TensorFlow 2.0},
+      year = {2019},
+      isbn = {9781450363075},
+      publisher = {Association for Computing Machinery},
+      address = {New York, NY, USA},
+      url = {https://doi.org/10.1145/3305366.3328041},
+      doi = {10.1145/3305366.3328041},
+      booktitle = {ACM SIGGRAPH 2019 Courses},
+      articleno = {10},
+      numpages = {211},
+      location = {Los Angeles, California},
+      series = {SIGGRAPH '19}
+    }
+    @InProceedings{Cole_2021_ICCV,
+      author    = {Cole, Forrester and Genova, Kyle and Sud, Avneesh and Vlasic, Daniel and Zhang, Zhoutong},
+      title     = {Differentiable Surface Rendering via Non-Differentiable Sampling},
+      booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+      month     = {October},
+      year      = {2021},
+      pages     = {6088-6097}
+    }
+    @InProceedings{Wang_2018_ECCV,
+      author = {Wang, Nanyang and Zhang, Yinda and Li, Zhuwen and Fu, Yanwei and Liu, Wei and Jiang, Yu-Gang},
+      title = {Pixel2Mesh: Generating 3D Mesh Models from Single RGB Images},
+      booktitle = {Proceedings of the European Conference on Computer Vision (ECCV)},
+      month = {September},
+      year = {2018}
+    }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      renderMathInElement(document.body);
+    });
+  </script>
+</toyb-post>
