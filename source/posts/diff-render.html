@@ -288,35 +288,36 @@
     <!-- <dt-code block language="python"> -->
       <pre class="l-middle">
         <code class="language-python">
-          def rasterize(vertices, triangles, attributes, image_width, image_height):
-            result = torch.zeros(image_height, image_width, 4)
-            for y in range(image_height):
-              for x in range(image_width):
-                ndc_x, ndc_y = normalized_device_coordinates(x, y)
+def rasterize(vertices, triangles, attributes, image_width, image_height):
+  # vertices: float32 tensor shape (num_vertices, 3) giving vertex positions
+  # triangles: int32 tensor shape (num_triangles, 3) giving vertex indices of triangles
+  # attributes: tensor shape (num_vertices, num_attributes) giving vertex attributes
 
-                soft_weights = torch.zeros(len(triangles))
-                soft_colors = torch.zeros(len(triangles))
+  rgba_result = torch.zeros(image_height, image_width, 4)
+  for y in range(image_height):
+    for x in range(image_width):
+      soft_weights = torch.zeros(len(triangles))
+      soft_colors = torch.zeros(len(triangles))
 
-                for i in range(len(triangles)):
-                  triangle = triangles[i]
-                  bc, d = barycentrics_of_and_distance_to_nearest_point(
-                    ndc_x, ndc_y,
-                    triangle, vertices
-                  )
+      for i in range(len(triangles)):
+        triangle = triangles[i]
+        bc, d = barycentrics_of_and_distance_to_nearest_point(
+          x, y, triangle, vertices
+        )
 
-                  # 1 is near plane, 0 is far plane
-                  z = normalized_depth(bc, triangle)
+        # 1 is near plane, 0 is far plane
+        z = normalized_depth(bc, triangle, vertices)
 
-                  c = sample_texture_and_light(triangle, attributes, bc)
-                  soft_colors[i] = c
-                  soft_weights[i] = soft_fragment(d) * torch.exp(z / gamma)
+        c = sample_texture_and_light(bc, triangle, attributes)
+        soft_colors[i] = c
+        soft_weights[i] = soft_fragment(d) * torch.exp(z / gamma)
 
-                sum_weights = torch.sum(soft_weights)
-                bg_weight = torch.exp(eps / gamma)
-                soft_weights = soft_weights / (sum_weights + bg_weight)
-                result[y][x] = soft_weights @ soft_colors + bg_color * bg_weight
+      sum_weights = torch.sum(soft_weights)
+      bg_weight = torch.exp(eps / gamma)
+      soft_weights = soft_weights / (sum_weights + bg_weight)
+      rgba_result[y][x] = soft_weights @ soft_colors + bg_color * bg_weight
 
-            return result
+  return rgba_result
         </code>
       </pre>
     <!-- </dt-code> -->
