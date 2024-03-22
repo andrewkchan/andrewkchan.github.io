@@ -281,6 +281,46 @@
       rendering approaches hard rendering in the limit, the optimum of a loss function incorporating it should be approximately equal to the optimum of the hard renderer, too.
     </p>
     <p>
+      The core rasterization procedure looks a bit like this<dt-fn>Of course this leaves out several optimizations and edge cases.
+        See <a href="https://github.com/andrewkchan/pytorch_mesh_renderer/blob/e868188504917b379b91e690d80b5695361c633a/src/soft_mesh_renderer/rasterize.py#L212">GitHub</a> for something
+        more than pseudocode.</dt-fn>:
+    </p>
+    <!-- <dt-code block language="python"> -->
+      <pre class="l-middle">
+        <code class="language-python">
+          def rasterize(vertices, triangles, attributes, image_width, image_height):
+            result = torch.zeros(image_height, image_width, 4)
+            for y in range(image_height):
+              for x in range(image_width):
+                ndc_x, ndc_y = normalized_device_coordinates(x, y)
+
+                soft_weights = torch.zeros(len(triangles))
+                soft_colors = torch.zeros(len(triangles))
+
+                for i in range(len(triangles)):
+                  triangle = triangles[i]
+                  bc, d = barycentrics_of_and_distance_to_nearest_point(
+                    ndc_x, ndc_y,
+                    triangle, vertices
+                  )
+
+                  # 1 is near plane, 0 is far plane
+                  z = normalized_depth(bc, triangle)
+
+                  c = sample_texture_and_light(triangle, attributes, bc)
+                  soft_colors[i] = c
+                  soft_weights[i] = soft_fragment(d) * torch.exp(z / gamma)
+
+                sum_weights = torch.sum(soft_weights)
+                bg_weight = torch.exp(eps / gamma)
+                soft_weights = soft_weights / (sum_weights + bg_weight)
+                result[y][x] = soft_weights @ soft_colors + bg_color * bg_weight
+
+            return result
+        </code>
+      </pre>
+    <!-- </dt-code> -->
+    <p>
       Overall, the process is a bit like rendering a blurred version of the normal image, except we're also blurring in the z-component and the formulation is independent of screen size,
       so we don't need to pick a blur kernel size (although in practice, implementations like PyTorch3D will limit aggregation to triangles within a given blur radius hyper-parameter).
     </p>
