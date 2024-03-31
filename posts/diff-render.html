@@ -54,7 +54,7 @@
   
   <dt-article>
     <h1>Adventures with Differentiable Mesh Rendering</h1>
-    <h2>Some ways we can get gradients from rendering and what we can do with them.</h2>
+    <h2>Some ways we can get gradients when rendering meshes and what we can do with them.</h2>
     <dt-byline></dt-byline>
     <p>
       I recently dove into differentiable rendering. This is an interesting technology which allows you to render
@@ -76,17 +76,21 @@
       animation of meshes is also more developed than with other primitives, and artists are more used to working with them.
     </p>
     <p>
-      So there is lots of interest in mesh reconstruction, and in differentiable mesh rendering because the technology could
-      more directly attack the task of producing 3D meshes from 2D images.
+      So there is lots of interest in mesh reconstruction and deep learning with meshes. Differentiable mesh rendering could
+      more directly attack these tasks<dt-fn>For mesh reconstruction in particular, it's also possible to first reconstruct a neural or gaussian splat scene representation from images,
+      then convert this intermediate representation to meshes via discretization techniques like <a href="https://en.wikipedia.org/wiki/Marching_cubes">marching cubes</a> or
+      <a href="https://hhoppe.com/poissonrecon.pdf">poisson reconstruction</a>. This pathway to meshes in fact often easier than fitting via differentiable mesh rendering,
+      and much current research focuses on improving it. I hope to dedicate an article to the topic sometime!</dt-fn>. It's also a great introduction to how differentiable rendering
+      works because mesh rendering is such a well-established technique.
     </p>
 
-    <h2>What do we need to make rendering differentiable?</h2>
+    <h2>What do we need to make rasterization differentiable?</h2>
     <p>
-      Consider a single pixel in a rendered image. We'd like to obtain a derivative of the pixel color with respect to all the rendering
+      Consider a single pixel in a rasterized image. We'd like to obtain a derivative of the pixel color with respect to all the rendering
       inputs, like mesh vertex positions, texture attributes, camera parameters, and lights.
     </p>
     <p>
-      Fundamentally, rendering is almost entirely a series of straightforward, differentiable operations on floating-point inputs: we
+      Fundamentally, rasterization is almost entirely a series of straightforward, differentiable operations on floating-point inputs: we
       multiply vertex positions by a series of matrices and perform some divisions to project triangle vertices from 3D to 2D, then when
       considering a single triangle's contribution to a pixel, we do more matrix multiplications and divisions (and maybe some dot products
       if lighting is involved) to get the final color of the pixel.
@@ -384,7 +388,7 @@ def rasterize(vertices, triangles, attributes, image_width, image_height):
     <h2>What are the limitations?</h2>
     <p>
       Mesh fitting via differentiable rendering requires specific input. The topology is fixed and must be provided by the user, the camera poses must be known, and the images
-      must be masked so that only the objects of interest contribute loss. This means differentiable rendering and gradient descent alone probably aren't general enough for
+      must be masked so that only the objects of interest contribute loss. This means differentiable mesh rendering and gradient descent alone probably aren't general enough for
       most ad-hoc real-world 3D reconstruction use cases.
     </p>
     <p>
