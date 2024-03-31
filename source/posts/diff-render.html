@@ -17,7 +17,7 @@
 
     <script type="text/front-matter">
       title: "Adventures with Differentiable Mesh Rendering"
-      description: "Some ways we can get gradients from rendering and what we can do with them."
+      description: "Some ways we can get gradients when rendering meshes and what we can do with them."
       authors:
       - Andrew Chan: http://andrewkchan.github.io
       affiliations:
@@ -60,7 +60,7 @@
       then convert this intermediate representation to meshes via discretization techniques like <a href="https://en.wikipedia.org/wiki/Marching_cubes">marching cubes</a> or
       <a href="https://hhoppe.com/poissonrecon.pdf">poisson reconstruction</a>. This pathway to meshes in fact often easier than fitting via differentiable mesh rendering,
       and much current research focuses on improving it. I hope to dedicate an article to the topic sometime!</dt-fn>. It's also a great introduction to how differentiable rendering
-      works because mesh rendering is such a well-established technique.
+      works because rendering of meshes is so well-established.
     </p>
 
     <h2>What do we need to make rasterization differentiable?</h2>
@@ -80,7 +80,7 @@
     </p>
     <img src="./diff-render-assets/rasterization.png" class="l-middle" alt="Traditional rasterization diagram" style="max-width: 90vw;">
     <p>
-      In more detail, to render a mesh with vertex positions and texture attributes, camera parameters, and lights, we:
+      In more detail, to rasterize a mesh with vertex positions and texture attributes, camera parameters, and lights, we:
       <ol>
         <li>
           <a href="https://www.songho.ca/opengl/gl_transform.html">Transform the vertices</a> from world space to a coordinate frame relative to the camera.
@@ -118,7 +118,7 @@
       <em><a href="https://github.com/andrewkchan/pytorch_mesh_renderer/tree/master/src/mesh_renderer">Source code for my mesh_renderer implementation on GitHub.</a></em>
     </p>
     <p>
-      First, we can examine a naive approach to rendering which ignores the sampling discontinuity. That is, assume for any given pixel, the triangle
+      First, we can examine a naive approach to rasterization which ignores the sampling discontinuity. That is, assume for any given pixel, the triangle
       contributing to that pixel does not change.
     </p>
     <p>
@@ -127,7 +127,7 @@
       the derivative of the result with <dt-code language="python">result.backward()</dt-code> will just flow gradients back to whatever inputs happened to be involved in the most recent run.
     </p>
     <p>
-      So for our differentiable renderer, if we implement it just like a normal renderer, treating PyTorch as a fancy linear algebra library - for any given pixel, we'll
+      So for our differentiable rasterizer, if we implement it just like a normal rasterizer, treating PyTorch as a fancy linear algebra library - for any given pixel, we'll
       obtain the derivative of its color with respect to the triangle that happened to be covering it (and any relevant texture attributes, lighting parameters, etc.) in
       the latest render.
     </p>
@@ -157,7 +157,7 @@
     </ul>
     <p>
       Second, it means we only obtain gradients for pixels that are covered. If we have a solid color triangle and we want to reduce the rendering loss to an image of the
-      same triangle translated to the side so there is no overlap, our naive renderer won't help because it won't provide any gradients with respect to the target pixels.
+      same triangle translated to the side so there is no overlap, our naive rasterizer won't help because it won't provide any gradients with respect to the target pixels.
     </p>
     <p>
       Finally, we're unable to obtain gradients for occluded elements. So if a red triangle is behind a blue triangle but we'd like to make a pixel red by optimizing the
@@ -195,7 +195,7 @@
       <em><a href="https://github.com/andrewkchan/pytorch_mesh_renderer/tree/master/src/soft_mesh_renderer">Source code for my soft_mesh_renderer implementation on GitHub.</a></em>
     </p>
     <p>
-      A better approach is to formulate rendering as a “soft” process<dt-cite key="Liu_2019_ICCV"></dt-cite> where all triangles have some probability
+      A better approach is to formulate rasterization as a “soft” process<dt-cite key="Liu_2019_ICCV"></dt-cite> where all triangles have some probability
       of contributing to a given pixel (triangles closer to the pixel have higher probability), and the sampling output is a sum of triangle contributions
       to a pixel weighted by probability.
       This is the approach used by PyTorch3D<dt-cite key="ravi2020accelerating"></dt-cite>, one of the most popular differentiable rendering packages today.
@@ -284,7 +284,7 @@
     </p>
     <p>
       Since all functions above are differentiable, gradients can flow from the output color back to any of the inputs (mesh vertices, attributes, lighting, camera). And since soft
-      rendering approaches hard rendering in the limit, the optimum of a loss function incorporating it should be approximately equal to the optimum of the hard renderer, too.
+      rasterization approaches hard rasterization in the limit, the optimum of a loss function incorporating it should be approximately equal to the optimum of the hard rasterizer, too.
     </p>
     <p>
       The core rasterization procedure looks a bit like this<dt-fn>Of course this leaves out several optimizations and edge cases.
@@ -333,25 +333,25 @@ def rasterize(vertices, triangles, attributes, image_width, image_height):
     </p>
 
     <h3>How well does it work?</h3>
-    <p>The soft renderer works much better. Cases that the naive renderer doesn't provide gradients for are handled robustly by the soft rendering formulation.</p>
+    <p>The soft rasterizer works much better. Cases that the naive rasterizer doesn't provide gradients for are handled robustly by the soft rasterization formulation.</p>
     <p>
       It can handle color cliffs across adjacent triangles because we get gradients from those triangles. So for a tessellated rectangle divided into a black half and white
       half, the gradient of intensity for a pixel in the black half would push the pixel towards the white half, even if it was in a triangle whose vertices were all black.
     </p>
     <p>
-      Uncovered pixels also get gradients from triangles. So the renderer is able to push triangles to previously un-covered areas of the screen via gradient descent. Occluded
+      Uncovered pixels also get gradients from triangles. So the rasterizer is able to push triangles to previously un-covered areas of the screen via gradient descent. Occluded
       triangles can also be similarly moved to the front.
     </p>
     <p>
-      For the teapot rotation example earlier, my soft differentiable renderer implementation is able to handle the 45-degree roll angle that my naive renderer couldn't:
+      For the teapot rotation example earlier, my soft differentiable rasterizer implementation is able to handle the 45-degree roll angle that my naive rasterizer couldn't:
     </p>
     <div class="l-middle">
       <video src="./diff-render-assets/teapot_45deg_soft.mp4" controls style="min-width: 320px; max-width: 400px; display: inline-block"></video>
       <img src="./diff-render-assets/teapot_45deg_soft_loss.png" alt="Optimization loss of the teapot at 45 degrees with soft renderer" style="max-width: 400px; display: inline-block">
-      <p class="caption"><i>This optimization was performed using lower-resolution renders because I didn't get around to implementing an optimized C++ kernel for my soft renderer.</i></p>
+      <p class="caption"><i>This optimization was performed using lower-resolution renders because I didn't get around to implementing an optimized C++ kernel for my soft rasterizer.</i></p>
     </div>
     <p>
-      I was also able to fit meshes with my soft renderer. Below, I fit a 402-vertex sphere mesh to three 96x96 views of a much higher poly cow mesh by minimizing silhouette loss
+      I was also able to fit meshes with my soft rasterizer. Below, I fit a 402-vertex sphere mesh to three 96x96 views of a much higher poly cow mesh by minimizing silhouette loss
       to the views using gradient descent:
     </p>
     <div class="l-middle">
@@ -367,8 +367,8 @@ def rasterize(vertices, triangles, attributes, image_width, image_height):
 
     <h2>What are the limitations?</h2>
     <p>
-      Mesh fitting via differentiable rendering requires specific input. The topology is fixed and must be provided by the user, the camera poses must be known, and the images
-      must be masked so that only the objects of interest contribute loss. This means differentiable mesh rendering and gradient descent alone probably aren't general enough for
+      Mesh fitting via differentiable rasterization requires specific input. The topology is fixed and must be provided by the user, the camera poses must be known, and the images
+      must be masked so that only the objects of interest contribute loss. This means differentiable mesh rasterization and gradient descent alone probably aren't general enough for
       most ad-hoc real-world 3D reconstruction use cases.
     </p>
     <p>
@@ -392,7 +392,7 @@ def rasterize(vertices, triangles, attributes, image_width, image_height):
       For instance, a popular research topic is how we might train a model to take in a single 2D image and output a 3D mesh: that is, how we might solve single-image 3D reconstruction
       with machine learning methods that learn how 2D images correspond to the most common objects in the real world. We can train such a model using 3D supervision (e.g. 3D mesh labels
       for each 2D image input), but there is only so much 3D data out there and it's not clear how we'd define loss if the model generates a mesh with a different topology than the label.
-      With differentiable rendering, we can train a network using only 2D supervision; given an image, the model can output some mesh, and the differentiable renderer can render it and
+      With differentiable mesh rendering, we can train a network using only 2D supervision; given an image, the model can output some mesh, and the differentiable renderer can render it and
       back-propagate image RGB loss through the mesh vertices.
     </p>
     <p>
@@ -404,21 +404,21 @@ def rasterize(vertices, triangles, attributes, image_width, image_height):
 
     <h2>Implementation notes</h2>
     <p>
-      <em>Source code for the renderers can be found on <a href="https://github.com/andrewkchan/pytorch_mesh_renderer">my GitHub</a>.</em>
+      <em>Source code for the rasterizers can be found on <a href="https://github.com/andrewkchan/pytorch_mesh_renderer">my GitHub</a>.</em>
     </p>
     <p>
-      Python-only implementations of either of these renderers are very slow. Basic optimizations like vectorizing some calculations and culling triangles outside of the soft renderer's
+      Python-only implementations of either of these rasterizer are very slow. Basic optimizations like vectorizing some calculations and culling triangles outside of the soft rasterizer's
       blur radius threshold by bounding box with quad trees help, but the lack of proper parallelism hurts a lot since the work to do scales very quickly with screen dimensions.
       Dynamically re-building the computation graph and back-propagating through it is expensive as well. <a href="https://github.com/facebookresearch/pytorch3d">Production</a>
       <a href="https://github.com/tensorflow/graphics">implementations</a> instead manually compute the forward and backwards
       passes, which avoids the overhead of auto-grad but is difficult to read and write. Additionally they tend use either <a href="https://pytorch.org/tutorials/advanced/cpp_extension.html">C++</a>
       (where better parallelism can be achieved with threads as well as all the other benefits of statically compiled code with more control over memory layout) or
       <a href="https://pytorch.org/tutorials/advanced/cpp_extension.html#writing-a-mixed-c-cuda-extension">CUDA</a> (far better parallelism by
-      actually leveraging the GPU for rendering, as it's intended to be used).
+      actually leveraging the GPU for rasterization, as it's intended to be used).
     </p>
     <p>
       Performing 1000 optimization steps to fit a 402-vertex mesh to three 96x96 target views took a little less than 5 CPU-hours (7 hours wall-clock time) on my M3 MacBook Pro using my
-      Python-only soft renderer implementation. In contrast, PyTorch3D's C++ soft renderer was able to fit a 2562-vertex mesh (over 6 times as many vertices) to the same images in even less
+      Python-only soft rasterizer implementation. In contrast, PyTorch3D's C++ soft rasterizer was able to fit a 2562-vertex mesh (over 6 times as many vertices) to the same images in even less
       time: 3 CPU-hours on my laptop. PyTorch3D's own online mesh fitting tutorials which leverage Google Colab machines with CUDA only take a few minutes to do something similar!
     </p>
   </dt-article>
