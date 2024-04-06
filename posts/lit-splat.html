@@ -86,7 +86,7 @@
         it captures the rough shapes of hard objects fairly well, even with the simplest implementation possible that uses the depth of each
         Gaussian's center rather than doing something more complicated to figure out the average depth of the section overlapping a pixel.
       </p>
-      <div class="b-dics l-middle" style="max-width: 40vw;">
+      <div class="b-dics l-middle" style="width: 600px; max-width: 70vw;">
         <img src="./lit-splat-assets/lego_color.png" alt="Original">
         <img src="./lit-splat-assets/lego_depth.png" alt="Depth">
       </div>
@@ -101,7 +101,7 @@
         noise-reducing filter which is similar to a Gaussian blur, but which also preserves edges in the image. The idea is to get a noise-free depth image which still
         contains accurate object shapes.
       </p>
-      <div class="b-dics l-middle" style="max-width: 40vw;">
+      <div class="b-dics l-middle" style="width: 600px; max-width: 70vw;">
         <img src="./lit-splat-assets/lego_pseudonormal_k0.png" alt="No filtering">
         <img src="./lit-splat-assets/lego_pseudonormal_k1.png" alt="Filtered">
       </div>
@@ -110,7 +110,7 @@
         the table and vase are super smooth when viewed normally, but actually have super bumpy depths which show up when rendered with lighting. The high-frequency bumps are
         mitigated a little with bilateral filtering but the low-frequency bumps are not.
       </p>
-      <div class="b-dics l-middle" style="max-width: 40vw;">
+      <div class="b-dics l-middle" style="width: 600px; max-width: 70vw;">
         <img src="./lit-splat-assets/garden_table_color.png">
         <img src="./lit-splat-assets/garden_table_lit_pseudonormals.png">
         <img src="./lit-splat-assets/garden_table_pseudonormals.png">
@@ -123,7 +123,7 @@
         in the garden scene<dt-fn>There are some issues where objects became more transparent with this training method, but I suspect that's just me not knowing how to tune the process,
         and not something inherent to the approach.</dt-fn>:
       </p>
-      <div class="b-dics l-middle" style="max-width: 40vw;">
+      <div class="b-dics l-middle" style="width: 600px; max-width: 70vw;">
         <img src="./lit-splat-assets/garden_table_color.png">
         <img src="./lit-splat-assets/garden_table_lit_xnormals.png">
         <img src="./lit-splat-assets/garden_table_xnormals.png">
@@ -131,7 +131,7 @@
       <p>
         The explicit normals make a huge difference. Compare the same scene reconstructed via Relightable Gaussians but rendered with pseudo-normals vs. explicit normals:
       </p>
-      <div class="b-dics l-middle" style="max-width: 40vw;">
+      <div class="b-dics l-middle" style="width: 600px; max-width: 70vw;">
         <img src="./lit-splat-assets/lego_lit_pseudonormal_k0.png" alt="No filter">
         <img src="./lit-splat-assets/lego_lit_pseudonormal_k1.png" alt="Filtered">
         <img src="./lit-splat-assets/lego_lit_normal.png" alt="Explicit">
@@ -154,7 +154,7 @@
         One thing this approach doesn't handle well is fuzzy surfaces and objects like grass. In splat reconstructions today these are usually represented with many scattered,
         mixed size and lower density gaussians, which look terrible with surface-based shading because the recovered surface is so bumpy. How could we improve how these look?
       </p>
-      <div class="b-dics l-middle" style="max-width: 40vw;">
+      <div class="b-dics l-middle" style="width: 600px; max-width: 70vw;">
         <img src="./lit-splat-assets/grass_color.png">
         <img src="./lit-splat-assets/grass_lit_pseudonormal.png">
       </div>
