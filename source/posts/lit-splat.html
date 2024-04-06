@@ -1,0 +1,275 @@
+<toyb-post>
+    <toyb-title>Real-Time Lighting with Gaussian Splats</toyb-title>
+    <toyb-date>April 4 2024</toyb-date>
+    <toyb-head>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+      <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+
+      <!-- Google tag (gtag.js) -->
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
+      <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-HYB0C59DXR');
+      </script>
+      <link rel="stylesheet" href="dics.min.css">
+      <script src="dics.min.js"></script>
+
+      <script type="text/front-matter">
+        title: "Real-Time Lighting with Gaussian Splats"
+        description: "Applying traditional dynamic lighting techniques to Gaussian splats."
+        authors:
+        - Andrew Chan: http://andrewkchan.github.io
+        affiliations:
+        -
+      </script>
+
+      <style>
+        .caption > i {
+          font-size: 15px;
+          line-height: 1.3em;
+        }
+      </style>
+    </toyb-head>
+    <dt-article>
+      <h1>Real-Time Lighting with Gaussian Splats</h1>
+      <h2>Applying traditional dynamic lighting techniques to Gaussian splats.</h2>
+      <dt-byline></dt-byline>
+      <p>
+        There's been a lot of interest lately in Gaussian splats<dt-cite key="kerbl20233d"></dt-cite>. This is a graphics primitive popularized by a
+        breakthrough last year that enables much faster, higher-quality reconstructions of real-world scenes than other primitives like 3D meshes.
+      </p>
+      <p>
+        Recently I saw a <a href="https://x.com/frustum/status/1708949244957311443">few-month old tweet</a> about lighting splats in real-time.
+        I thought it was cool how simple the approach was and I couldn't find the source code, so I re-created it in WebGL. Try it out below or
+        <a href="https://andrewkchan.dev/lit-splat">click here</a> for fullscreen.
+        You can use your mouse to move the camera or the lights and press M to toggle between lighting mode and no lighting.
+      </p>
+      <iframe class="l-middle" src="https://andrewkchan.dev/lit-splat/?url=garden.lsplat" style="width: 700px; height: 500px; border: none;"></iframe>
+      <p>
+        The idea is to use rasterization to render splats just like in the original paper, but to recover surface normals from depth, then light
+        the scene using traditional shading and <a href="https://learnopengl.com/Advanced-Lighting/Shadows/Shadow-Mapping">shadow mapping</a>.
+      </p>
+      <p>
+        Depth is computed the same way we compute color for each pixel, using the <a href="https://en.wikipedia.org/wiki/Alpha_compositing#Description">"over"
+        operator to do alpha compositing</a>. Given \( N \) splats with depths \( d_i \) and alphas \( \alpha_i \) ordered front-to-back:
+
+        $$
+        D = \displaystyle \sum_{i=1}^N d_i \alpha_i \prod_{j=1}^{i-1} (1-\alpha_j)
+        $$
+      </p>
+      <p>
+        The formula feels nonphysical because it can theoretically result in a surface in empty space between 2 gaussians, but in practice
+        it captures the rough shapes of hard objects fairly well, even with the simplest implementation possible that uses the depth of each
+        Gaussian's center rather than doing something more complicated to figure out the average depth of the section overlapping a pixel.
+      </p>
+      <div class="b-dics l-middle" style="max-width: 600px;">
+        <img src="./lit-splat-assets/lego_color.png" alt="Original">
+        <img src="./lit-splat-assets/lego_depth.png" alt="Depth">
+      </div>
+      <p>
+        Pseudo-normals are computed for each pixel by reconstructing the world-space points of it and its neighbors \( \mathbf{p}_0, \mathbf{p}_1, \mathbf{p}_2 \), then crossing
+        the resulting pseudo-tangent and bitangent vectors \( \mathbf{p}_1 - \mathbf{p}_0 \times \mathbf{p}_2 - \mathbf{p}_0 \).
+      </p>
+      <p>
+        Because Gaussian splat reconstructions are fuzzy representations optimized to look right on screen rather than form coherent surfaces, the resulting depth is quite
+        noisy, even if the overall shape is captured decently, resulting in bumpy-looking surfaces. As the Twitter thread suggested, we can mitigate the bumpiness
+        somewhat by running a <a href="https://en.wikipedia.org/wiki/Bilateral_filter">bilateral filter</a> over depth before normal recovery. A bilateral filter is a
+        noise-reducing filter which is similar to a Gaussian blur, but which also preserves edges in the image. The idea is to get a noise-free depth image which still
+        contains accurate object shapes.
+      </p>
+      <div class="b-dics l-middle" style="max-width: 600px;">
+        <img src="./lit-splat-assets/lego_pseudonormal_k0.png" alt="No filtering">
+        <img src="./lit-splat-assets/lego_pseudonormal_k1.png" alt="Filtered">
+      </div>
+      <p>
+        In some splat reconstructions, the underlying geometry is still too bumpy. For example, in the Mip-NeRF360<dt-cite key="barron2022mipnerf360"></dt-cite> garden dataset,
+        the table and vase are super smooth when viewed normally, but actually have super bumpy depths which show up when rendered with lighting. The high-frequency bumps are
+        mitigated a little with bilateral filtering but the low-frequency bumps are not.
+      </p>
+      <div class="b-dics l-middle" style="max-width: 600px;">
+        <img src="./lit-splat-assets/garden_table_color.png">
+        <img src="./lit-splat-assets/garden_table_lit_pseudonormals.png">
+        <img src="./lit-splat-assets/garden_table_pseudonormals.png">
+      </div>
+      <p>
+        Can we improve the geometry reconstructed during training? A few papers do this. <a href="https://nju-3dv.github.io/projects/Relightable3DGaussian/">Relightable 3D Gaussians</a>
+        <dt-cite key="R3DG2023"></dt-cite> proposes a method that not only learns better geometry but is able to estimate the materials and lighting for all the splats in a scene.
+        The reconstructed splats form better geometry because of a new loss term pushing the reconstructed depth to look more like the depth
+        that a pre-trained neural network thinks is right, and explicit normals are learned per-splat so that they don't need to be recovered at render-time. The result looks way better
+        in the garden scene<dt-fn>There are some issues where objects became more transparent with this training method, but I suspect that's just me not knowing how to tune the process,
+        and not something inherent to the approach.</dt-fn>:
+      </p>
+      <div class="b-dics l-middle" style="max-width: 600px;">
+        <img src="./lit-splat-assets/garden_table_color.png">
+        <img src="./lit-splat-assets/garden_table_lit_xnormals.png">
+        <img src="./lit-splat-assets/garden_table_xnormals.png">
+      </div>
+      <p>
+        The explicit normals make a huge difference. Compare the same scene reconstructed via Relightable Gaussians but rendered with pseudo-normals vs. explicit normals:
+      </p>
+      <div class="b-dics l-middle" style="max-width: 600px;">
+        <img src="./lit-splat-assets/lego_lit_pseudonormal_k0.png" alt="No filter">
+        <img src="./lit-splat-assets/lego_lit_pseudonormal_k1.png" alt="Filtered">
+        <img src="./lit-splat-assets/lego_lit_normal.png" alt="Explicit">
+      </div>
+      <p>
+        The R3DG paper's reconstructed materials can be used for physically-based re-rendering of objects
+        <dt-fn>I haven't been able to get the learned materials working with my viewer yet. If anyone is able to figure this out, let me know!</dt-fn>.
+        There are some cool videos on the <a href="https://nju-3dv.github.io/projects/Relightable3DGaussian/">project page</a> that demonstrate this.
+        The way it does this is super cool: lighting and materials are jointly optimized using a method called NeILFs<dt-cite key="yao2022neilf"></dt-cite> which doesn't bother to simulate real
+        lighting (which would be super slow to do accurately in complex real-world lighting conditions) and instead iteratively guesstimates the incident light at every point with a neural network.
+      </p>
+      <h2>Ideas for improvement</h2>
+      <p>Following are my scattered thoughts as someone still pretty new to graphics programming.</p>
+      <p>
+        The surface-based shading technique I used works suprisingly well. Since most of what we see in gaussian splat scenes are hard objects with well-defined boundaries,
+        we're able to recover a fairly accurate surface, which is enough for us to perform traditional lighting. What I built so far only has basic shading and shadow-mapping
+        but could be easily extended with more advanced lighting techniques to provide global illumination and PBR.
+      </p>
+      <p>
+        One thing this approach doesn't handle well is fuzzy surfaces and objects like grass. In splat reconstructions today these are usually represented with many scattered,
+        mixed size and lower density gaussians, which look terrible with surface-based shading because the recovered surface is so bumpy. How could we improve how these look?
+      </p>
+      <div class="b-dics l-middle" style="max-width: 600px;">
+        <img src="./lit-splat-assets/grass_color.png">
+        <img src="./lit-splat-assets/grass_lit_pseudonormal.png">
+      </div>
+      <ul>
+        <li>
+            A common technique to <a href="https://www.scratchapixel.com/lessons/3d-basic-rendering/volume-rendering-for-developers/intro-volume-rendering.html">render volumes like smoke or fog</a>
+            in real-time is to use ray-marching. We intentionally march multiple steps inside a volume and measure the light at each step to approximate the color reflected along the ray.
+            Lighting can be made fast with techniques like caching lighting in a voxel grid or deep shadow maps.
+        </li>
+        <li>
+            Gaussian splats could be rendered using ray-marching. But ray-marching within each gaussian probably wouldn't help because most of these gaussians
+            are so small that light doesn't vary much within the volume. So it's enough to take a single sample, which is what rasterization is doing.
+            Ray-marching is also a lot slower than rasterization and we'd be trading off performance just so that the few fuzzy parts of a scene look better.
+        </li>
+        <li>
+            What we really want here is more accurate light reflection, firstly because there is no “surface” within these fuzzy volumes and secondly because we want to capture the fact that light continues
+            to travel into the volume. The first problem seems trickier to solve because we'd need some way of deciding whether an individual gaussian is part of a surface or not.
+        </li>
+      </ul>
+      <p>
+        There are applications which render objects as fuzzy volumes or point clouds with lighting, animations, etc. successfully at massive scale.
+        One example is <a href="https://en.wikipedia.org/wiki/Dreams_(video_game)">Dreams</a>, which came out in 2020 for the PS4 and which used a combination of signed
+        distance fields and point clouds to represent user-generated content. The use of these alternate graphics primitives gave the game a unique "painterly" look and
+        feel<dt-fn>I suspect it enabled the sculpting editor to be much more intuitive and flexible, too.</dt-fn>.
+      </p>
+      <p>
+        Dreams appears to use something much more like surface-based shading.
+        Alex Evan's <a href="https://advances.realtimerendering.com/s2015/mmalex_siggraph2015_hires_final.pdf">SIGGRAPH 2015 talk</a><dt-cite key="evans2015learning"></dt-cite> given early in the game's development describes
+        point splatting yielding a <a href="https://en.wikipedia.org/wiki/Deferred_shading">G-buffer</a> with normal, albedo, roughness, and Z, with deferred lighting done on the result.
+        From a <a href="https://www.resetera.com/threads/this-was-built-in-dreams-on-a-base-ps4-my-jaw-is-on-the-floor.177884/post-30413009">resetera thread</a>:
+      </p>
+      <p style="display: block; background: white; border-left: 3px solid rgba(0, 0, 0, 0.05); padding: 0 0 0 24px; color: rgba(0, 0, 0, 0.7);">
+        <i>
+            so to sum up: dreams has hulls and fluff; hulls are what you see when you see something that looks 'tight' or solid; and the fluff is the painterly stuff.
+            the hulls are rendered using 'raymarching' of a signed distance field (stored in bricks), (rather than splatted as they were before). then we splat fluffy stuff on top,
+            using lots of layers of stochastic alpha to make it ... fluffy :) this all generates a 'classic' g-buffer, and the lighting is all deferred in a fairly vanilla way
+            (GGX specular model).
+        </i>
+      </p>
+      <h2>Why?</h2>
+      <p>
+        What's the point of all of this? If we want dynamic lighting in scenes captured by Gaussian splats, why don't we just convert the splats to a mesh representation and relight that?
+      </p>
+      <p>
+        If we convert to meshes, we can also incorporate splats into existing mesh-based workflows and renderers rather than building out specialized paths. This would be awesome for
+        industry adoption of splats. Existing mesh-based renderers are also optimized to the hilt.
+        Geometry systems like <a href="https://www.notebookcheck.net/Unreal-5-s-Nanite-system-flexes-its-muscles-in-a-jawdropping-map-with-billions-of-polygons-onscreen.543601.0.html">
+        Unreal Engine 5's Nanite</a> already make it possible to use extremely detailed, high-poly real-world captures via photogrammetry scans in videogames today.
+        Gaussian splats make it even easier to get these real-world captures. So there is lots of interest here. Papers like SuGaR<dt-cite key="guedon2023sugar"></dt-cite>
+        and Gaussian Frosting<dt-cite key="guedon2024gaussian"></dt-cite> demonstrate techniques to do this with good performance on benchmarks. The resulting mesh can be further
+        optimized to have accurate materials via <a href="https://andrewkchan.dev/posts/diff-render.html">differentiable mesh rendering</a> and methods like NeILF, which isn't specific to splats.
+      </p>
+      <p>
+        That said working with point cloud and splat representations directly have some advantages. While meshing a splat representation is not too difficult, it takes
+        extra time and resources, and the result is not guaranteed to be accurate. It's also sometimes easier to work with splats, for example to give scenes
+        artistic flair like in Dreams. For similar reasons, SuGaR and Gaussian Frosting propose a hybrid rendering solution where objects are rendered as meshes with a thin layer of
+        Gaussian splats attached to the surface to capture fuzzy details like fur.
+      </p>
+      <p>
+        Overall, while Gaussian splatting was a breakthrough technology for fast and accurate 3D reconstruction, we're still discovering what the splat format will be useful
+        for beyond just “3D photos”. Time will tell if splats will be useful mainly as an intermediate format that we get from real-world captures, or if they'll be
+        everywhere in future games and 3D design software. In the meantime research into rendering splats continues. Some interesting papers:
+      </p>
+      <ul>
+        <li>Animation: <a href="https://animatable-gaussians.github.io/">Animatable Gaussians</a>, <a href="https://nvlabs.github.io/GAvatar/">GAvatar</a></li>
+        <li>Lighting: <a href="https://nju-3dv.github.io/projects/Relightable3DGaussian/">Relightable 3D Gaussian</a>, <a href="https://asparagus15.github.io/GaussianShader.github.io/">GaussianShader</a></li>
+        <li>Modeling fuzzy things: <a href="https://anttwo.github.io/frosting/">Gaussian Frosting</a></li>
+        <li>Rendering larger scenes faster: <a href="https://dekuliutesla.github.io/citygs/">CityGaussian</a>, <a href="https://m-niemeyer.github.io/radsplat/">RadSplat</a></li>
+      </ul>
+    </dt-article>
+
+    <dt-appendix>
+    </dt-appendix>
+
+    <script type="text/bibliography">
+        @article{kerbl20233d,
+            title={3d gaussian splatting for real-time radiance field rendering},
+            author={Kerbl, Bernhard and Kopanas, Georgios and Leimk{\"u}hler, Thomas and Drettakis, George},
+            journal={ACM Transactions on Graphics},
+            volume={42},
+            number={4},
+            pages={1--14},
+            year={2023},
+            publisher={ACM}
+        }
+        @article{R3DG2023,
+            author    = {Gao, Jian and Gu, Chun and Lin, Youtian and Zhu, Hao and Cao, Xun and Zhang, Li and Yao, Yao},
+            title     = {Relightable 3D Gaussian: Real-time Point Cloud Relighting with BRDF Decomposition and Ray Tracing},
+            journal   = {arXiv:2311.16043},
+            year      = {2023},
+        }
+        @inproceedings{yao2022neilf,
+            title={Neilf: Neural incident light field for physically-based material estimation},
+            author={Yao, Yao and Zhang, Jingyang and Liu, Jingbo and Qu, Yihang and Fang, Tian and McKinnon, David and Tsin, Yanghai and Quan, Long},
+            booktitle={European Conference on Computer Vision},
+            pages={700--716},
+            year={2022},
+            organization={Springer}
+        }
+        @article{barron2022mipnerf360,
+            title={Mip-NeRF 360: Unbounded Anti-Aliased Neural Radiance Fields},
+            author={Jonathan T. Barron and Ben Mildenhall and
+                    Dor Verbin and Pratul P. Srinivasan and Peter Hedman},
+            journal={CVPR},
+            year={2022}
+        }
+        @article{evans2015learning,
+            title={Learning from failure: a survey of promising, unconventional and mostly abandoned renderers for ‘dreams ps4’, a geometrically dense, painterly ugc game},
+            author={Evans, Alex},
+            journal={Advances in Real-Time Rendering in Games. MediaMolecule, SIGGRAPH},
+            volume={2},
+            year={2015}
+        }
+        @article{guedon2023sugar,
+            title={Sugar: Surface-aligned gaussian splatting for efficient 3d mesh reconstruction and high-quality mesh rendering},
+            author={Gu{\'e}don, Antoine and Lepetit, Vincent},
+            journal={arXiv preprint arXiv:2311.12775},
+            year={2023}
+        }
+        @article{guedon2024gaussian,
+            title={Gaussian Frosting: Editable Complex Radiance Fields with Real-Time Rendering},
+            author={Gu{\'e}don, Antoine and Lepetit, Vincent},
+            journal={arXiv preprint arXiv:2403.14554},
+            year={2024}
+        }
+
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement(document.body);
+      });
+      document.querySelectorAll('.b-dics').forEach((el) => {
+          new Dics({
+            container: el,
+          });
+      })
+    </script>
+  </toyb-post>
