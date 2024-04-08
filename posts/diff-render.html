@@ -411,9 +411,9 @@ def rasterize(vertices, triangles, attributes, image_width, image_height):
       The biggest use case is to enable deep learning to be used on tasks that involve going from 2D images to 3D meshes.
       For instance, a popular research topic is how we might train a model to take in a single 2D image and output a 3D mesh: that is, how we might solve single-image 3D reconstruction
       with machine learning methods that learn how 2D images correspond to the most common objects in the real world. We can train such a model using 3D supervision (e.g. 3D mesh labels
-      for each 2D image input), but there is only so much 3D data out there and it's not clear how we'd define loss if the model generates a mesh with a different topology than the label.
-      With differentiable mesh rendering, we can train a network using only 2D supervision; given an image, the model can output some mesh, and the differentiable renderer can render it and
-      back-propagate image RGB loss through the mesh vertices.
+      for each 2D image input) using metrics like the <a href="https://en.wikipedia.org/wiki/Hausdorff_distance">Hausdorff distance</a> to allow predictions to have different topologies than
+      labels, but there is only so much 3D data out there. With differentiable mesh rendering, we can train a network using only 2D supervision; given an image, the model can output some mesh,
+      and the differentiable renderer can render it and back-propagate image RGB loss through the mesh vertices.
     </p>
     <p>
       We can extend this to tasks which involve predicting parameters that influence the appearance of some object in 3D again given only 2D supervision. For example, a “3D morphable model”
