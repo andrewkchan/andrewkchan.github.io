@@ -184,7 +184,17 @@
         Dreams appears to use something much more like surface-based shading.
         Alex Evan's <a href="https://advances.realtimerendering.com/s2015/mmalex_siggraph2015_hires_final.pdf">SIGGRAPH 2015 talk</a><dt-cite key="evans2015learning"></dt-cite> given early in the game's development describes
         point splatting yielding a <a href="https://en.wikipedia.org/wiki/Deferred_shading">G-buffer</a> with normal, albedo, roughness, and Z, with deferred lighting done on the result.
-        From a <a href="https://www.resetera.com/threads/this-was-built-in-dreams-on-a-base-ps4-my-jaw-is-on-the-floor.177884/post-30413009">resetera thread</a>:
+        From a <a href="https://www.resetera.com/threads/this-was-built-in-dreams-on-a-base-ps4-my-jaw-is-on-the-floor.177884/post-30413009">resetera thread</a>, the final renderer
+        used surface-based shading on geometry comprised of both splats and solid signed-distance fields, with the latter being added in later so that large scenes could benefit from occlusion culling:
+      </p>
+      <p style="display: block; background: white; border-left: 3px solid rgba(0, 0, 0, 0.05); padding: 0 0 0 24px; color: rgba(0, 0, 0, 0.7);">
+        <i>
+          things evolved quite a bit since the siggraph preso. the E3 trailer from that era was rendered using the atomic splat renderer mentioned at the end of the talk, 
+          and it's still my favourite 'funky tech' wise, however it suffered because everything had microscopic holes! 
+          ...
+          why is this a big problem? because this broke occlusion culling, which we rely on heavily for performance
+          ...
+        </i>
       </p>
       <p style="display: block; background: white; border-left: 3px solid rgba(0, 0, 0, 0.05); padding: 0 0 0 24px; color: rgba(0, 0, 0, 0.7);">
         <i>
