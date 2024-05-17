@@ -310,7 +310,6 @@
     let simRes = getResolution(config.SIM_RESOLUTION);
     let dyeRes = getResolution(config.DYE_RESOLUTION);
     let particleRes = { width: config.PARTICLE_RESOLUTION, height: config.PARTICLE_RESOLUTION };
-    console.log("makeVelocityFieldSimulation", particleRes);
     let simWidth = simRes.width;
     let simHeight = simRes.height;
     let dyeWidth = dyeRes.width;

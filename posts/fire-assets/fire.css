@@ -25,17 +25,7 @@
 .demo-canvas {
   width: 100%;
   height: 400px;
-  /* width:800px; */
 }
-
-/*
-good
-makeVelocityFieldSimulation {width: 424.96, height: 256}height: 256width: 424.96[[Prototype]]: Object
-*/
-/*
-bad
-makeVelocityFieldSimulation {width: 512, height: 256}height: 256width: 512[[Prototype]]: Object
- */
 
 .demo {
   position: relative;
