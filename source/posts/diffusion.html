@@ -66,10 +66,21 @@
         #toc {
             line-height: 0.3em;
             width: calc(984px - 648px);
-            margin-right: 72px;
-            position: sticky; 
-            top: 72px;
-            z-index: 2;
+        }
+        @media (min-width: 1280px) {
+            #toc {
+                margin-right: 72px;
+                position: sticky; 
+                top: 72px;
+                z-index: 2;
+            }
+            #trex-noise-schedule-container { 
+                white-space: nowrap;
+            }
+            #trex-noise-schedule-gutter { 
+                margin-right:calc((100vw - 984px) / 2); 
+                z-index: 10 
+            }
         }
         #toc > li {
             list-style-type: none;
@@ -77,6 +88,9 @@
         .l-gutter {
             position: relative;
             background-color: white;
+        }
+        #trex-noise-schedule-container {
+            width: min(90vw, 800px);
         }
       </style>
     </toyb-head>
@@ -265,7 +279,7 @@
 
         This is used to derive the reverse process which we want to learn, and the training objective where we predict the noise that we add to images.
       </p>
-      <img src="./diffusion-assets/ddpm_markov_diagram.png" alt="Noising and denoising processes in DDPM" class="l-middle" />
+      <img src="./diffusion-assets/ddpm_markov_diagram.png" alt="Noising and denoising processes in DDPM" class="l-middle" style="width:min(90vw, 800px)" />
       <p class="caption"><i>Image via <dt-cite key="weng2021diffusion"></dt-cite><dt-cite key="ho2020denoising"></dt-cite></i>.</p>
       <p>
         Now consider the reverse process. Given a noisy image \( \mathbf{x}_t \), what's the distribution of the previous, less-noisy version of it \(q(\mathbf{x}_{t-1} | \mathbf{x}_t)\)?
@@ -530,7 +544,7 @@ def sample(model, img_size, alpha, alpha_bar):
         Let's adjust our schedule so that the model trains on more high-signal examples. This improves performance on lower-dimensional data while doing the opposite for higher-dimensional data<dt-cite key="chen2023importance"></dt-cite><dt-cite key="nichol2021improved"></dt-cite>.
         It gets us our best dinosaur yet:
       </p>
-      <div class="l-gutter caption" style="margin-right:calc((100vw - 984px) / 2); z-index: 10">
+      <div class="l-gutter caption" id="trex-noise-schedule-gutter">
         <p>
             <b>Left:</b> our original and new \(\bar\alpha_t\) schedules.
             <b>Right:</b> 1000 samples from the trained model.
@@ -539,7 +553,7 @@ def sample(model, img_size, alpha, alpha_bar):
             The original schedule already didn't take us to pure noise, with \(\bar\alpha_T \approx 0.28 \). The new schedule ends at where the old schedule was halfway, at \(0.6\).
         </p>
       </div>
-      <div class="l-middle" style="width: min(90vw, 800px); white-space: nowrap">
+      <div class="l-middle" id="trex-noise-schedule-container">
         <img src="./diffusion-assets/trex-viz/alpha_bar_modified.svg" alt="Datasaurus" style="display: inline-block; width: min(90vw, 350px)" />
         <img src="./diffusion-assets/trex-viz/mlp_fourier_fourier_rescheduled.svg" alt="Datasaurus" id="trex-mlp-fourier-fourier-rescheduled" style="display: inline-block; width: min(90vw, 350px)" />
       </div>
@@ -835,9 +849,7 @@ def sample(model, img_size, alpha, alpha_bar):
         Beyond AlphaFold, other applications of diffusion in computational biology include single-cell data analysis, drug and small molecule design, and protein-ligand interaction<dt-cite key="guo2023diffusion"></dt-cite>.
       </p>
       <h2 id="section-4.3">4.3 Robotics</h2>
-      <div class="l-middle">
-          <iframe width="560" height="315" src="https://www.youtube.com/embed/w-CGSQAO5-Q?si=1VGVkp74WMc1zKne" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-      </div>
+      <iframe width="560" height="315" src="https://www.youtube.com/embed/w-CGSQAO5-Q?si=1VGVkp74WMc1zKne" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen class="l-middle"></iframe>
       <p class="caption">
         <i>
             Video by Toyota Research Institute on how diffusion is enabling breakthroughs in robotics. 
