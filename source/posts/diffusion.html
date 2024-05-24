@@ -1,0 +1,1058 @@
+<toyb-post>
+    <toyb-title>Diffusion Models</toyb-title>
+    <toyb-date>May 15 2024</toyb-date>
+    <toyb-head>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+      <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+  
+      <!-- Google tag (gtag.js) -->
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
+      <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+  
+        gtag('config', 'G-HYB0C59DXR');
+      </script>
+  
+      <script type="text/front-matter">
+        title: "Diffusion Models"
+        description: "Notes on theory and practice of image generation models like Stable Diffusion."
+        authors:
+        - Andrew Chan: http://andrewkchan.github.io
+        affiliations:
+        -
+      </script>
+  
+      <style>
+        .caption {
+          font-size: 15px;
+          line-height: 1.3em;
+        }
+        .slider {
+            width: 100%;
+        }
+        #trex-forward-container {
+            width: min(90vw, 650px);
+        }
+        #trex-forward-main {
+            white-space: nowrap;
+        }
+        #trex-forward-slider-container {
+            width: 90%;
+            margin: 0 auto;
+        }
+        .trex-forward-carousel {
+            white-space: nowrap;
+        }
+        .trex-forward-carousel-img {
+            display: inline-block;
+            width: 19%;
+            opacity: 0.6;
+        }
+        .trex-forward-carousel-img:hover {
+            cursor: pointer;
+            opacity: 1.0;
+        }
+        #normalizing-flow>#normalizing-flow-gif {
+            display: none;
+        }
+        #normalizing-flow:hover>#normalizing-flow-gif {
+            display: inline-block;
+        }
+        #normalizing-flow:hover>#normalizing-flow-png {
+            display: none;
+        }
+        #toc {
+            line-height: 0.3em;
+            width: calc(984px - 648px);
+            margin-right: 72px;
+            position: sticky; 
+            top: 72px;
+            z-index: 2;
+        }
+        #toc > li {
+            list-style-type: none;
+        }
+        .l-gutter {
+            position: relative;
+            background-color: white;
+        }
+      </style>
+    </toyb-head>
+    <dt-article>
+      <div class="l-gutter caption" id="toc"><h4>Contents</h4></div>
+      <h1>Diffusion Models</h1>
+      <h2>Notes on the theory behind models like Stable Diffusion and their applications.</h2>
+      <dt-byline></dt-byline>
+      <p>
+        I spent 2022 learning to draw and was blindsided by the rise of AI art<dt-fn>There is lots to say about this, whether it has been or will be a good thing for 
+        artists and society in the long run. I hope to write about it in another post.</dt-fn> models like Stable Diffusion. Suddenly, the computer was a better artist than I could ever hope to be.
+      </p>
+      <p>
+        It's been two years, and image generation with diffusion is better than ever. It's also led to breakthroughs in animation, 
+        video generation, 3D modeling, protein structure prediction, and even robot trajectory planning. Where did it come from, how does it work and where is it going?
+      </p>
+      <p>
+        This post collects my notes on the theory of diffusion and applications to image generation and other tasks. Readers should know some probability theory (Bayes' rule, Gaussian distributions).
+        Examples and code using PyTorch are provided.
+      </p>
+      <dt-byline></dt-byline>
+      <h1 id="section-1">1. Generative modeling</h1>
+      <p>
+        The basic problem of generative modeling is: given a set of samples from an unknown distribution \( \mathbf{x} \sim p(\mathbf{x}) \), we want to generate new samples from that distribution.
+      </p>
+      <p>
+        <a href="https://poloclub.github.io/ganlab/">Generative adversarial networks</a> treat this as a game: a generator model taking a random seed is trained to fool a discriminator, which is simultaneously trained to tell real samples from the 
+        dataset from fake. GANs can <a href="https://thispersondoesnotexist.com/">synthesize amazing images</a> but are notoriously hard to train. They do not explicitly model \( p(\mathbf{x}) \) and in practice end up incapable<dt-cite key="grover2018flowgan"></dt-cite> of generating substantial subsets of it.
+        <dt-fn>In the extreme case we get <a href="https://en.wikipedia.org/wiki/Generative_adversarial_network#Mode_collapse">mode collapse</a>, where the generator learns to cycle between a small subset of possible outputs to fool the discriminator.</dt-fn>
+      </p>
+      <p>
+        A more explicit approach is to learn a deterministic, reversible mapping from the samples we have to a distribution which we know how to sample from, like the unit gaussian. Then we can sample 
+        a point from the known distribution and apply the inverse mapping to get a sample from \( p(\mathbf{x}) \). This is conceptually attractive and is called  
+        <a href="https://blog.evjang.com/2018/01/nf1.html">normalizing flows</a>. Flows have also been used for images: <a href="https://openai.com/index/glow/">OpenAI's 2018 Glow</a> 
+        generated realistic images of faces with a semantically meaningful latent space.
+      </p>
+      <div id="normalizing-flow" class="l-middle">
+        <img src="./diffusion-assets/normalizing_flow.png" alt="Normalizing flow" id="normalizing-flow-png" style="width:min(90vw, 550px)" />  
+        <img src="./diffusion-assets/normalizing_flow.gif" alt="Normalizing flow" id="normalizing-flow-gif" style="width:min(90vw, 550px)" />
+      </div>
+      <p class="caption">
+        <b>Hover to play.</b>
+        <i>Image via <a href="https://blog.evjang.com/2019/07/nf-jax.html">Eric Jang's blog</a>. A normalizing flow learns a deterministic, probability-density-preserving mapping between the normal distribution and a 2D dataset.</i>
+      </p>
+
+      <h2 id="section-1.1">1.1 Denoising diffusion models</h2>
+      <p>
+        What if instead of mapping data points to a normal distribution deterministically, we mapped points stochastically, by blending random noise into them?
+      </p>
+      <p>
+        This seems weird at first. Technically this mapping wouldn't be reversible, because a given data point could map to any point in the target space.
+      </p>
+      <p>
+        But suppose we were to do this over many steps, where we start with a clean data point, then blend in a small amount of noise, repeating many times until we have 
+        something that looks like pure noise.
+      </p>
+      <ul>
+        <li>
+            At any given time, looking at a single noisy datapoint, you can sort of tell where the datapoint might have been in the previous step.
+        </li>
+        <li>
+            And given any point \( \mathbf{y} \) in the target space and any point \( \mathbf{x} \) in our original space, \( \mathbf{y} \) comes from
+            \( \mathbf{x} \) with probability arbitrarily close to \( p(\mathbf{x}) \), depending on how much noise we choose to blend into our data. 
+            So if we learn to reverse the many-step process, we should be able to sample from \( p(\mathbf{x}) \). This is the idea of <em>denoising diffusion</em>.
+        </li>
+      </ul>
+      <p>
+        This is like the physical process of diffusion, where a drop of ink slowly diffuses out to fill a tank by the random motion of individual ink particles.
+      </p>
+      <div class="l-gutter">
+        <p class="caption">
+            A 2D dataset being mapped to the unit gaussian over 50 noising steps.
+            Adjust the slider or click the previews below to see it in action.
+        </p>
+        <p class="caption">
+            <b>Left:</b> our 2D dataset with noise added at the current step. <b>Right:</b>
+            the expected direction over all the directions a noisy point might have come from in the previous step.
+        </p>
+      </div>
+      <div id="trex-forward-container" class="l-middle">
+        <div id="trex-forward-main">
+            <img src="./diffusion-assets/trex-viz/step001.svg" alt="Forward noising step" id="trex-forward-img" style="display:inline-block; width:49%" />
+            <img src="./diffusion-assets/trex-viz/drift001.svg" alt="Forward noising step drift" id="trex-forward-img-drift" style="display:inline-block; width:49%" />
+        </div>
+        <div id="trex-forward-slider-container">
+            <input class="slider" type="range" min="0" max="50" value="1" step="1" id="trex-forward-slider" />
+        </div>
+        <div id="trex-forward-carousel">
+            <img src="./diffusion-assets/trex-viz/step000.svg" alt="Step 0" class="trex-forward-carousel-img" value="0" />
+            <img src="./diffusion-assets/trex-viz/step006.svg" alt="Step 6" class="trex-forward-carousel-img" value="6" />
+            <img src="./diffusion-assets/trex-viz/step012.svg" alt="Step 12" class="trex-forward-carousel-img" value="12" />
+            <img src="./diffusion-assets/trex-viz/step025.svg" alt="Step 25" class="trex-forward-carousel-img" value="25" />
+            <img src="./diffusion-assets/trex-viz/step050.svg" alt="Step 50" class="trex-forward-carousel-img" value="50" />
+        </div>
+        <script type="text/javascript">
+            const forwardSlider = document.getElementById("trex-forward-slider");
+            const forwardImg = document.getElementById("trex-forward-img");
+            const forwardDriftImg = document.getElementById("trex-forward-img-drift");
+            forwardSlider.oninput = function() {
+                displayStep(this.value);
+            }
+            Array.from(document.getElementsByClassName("trex-forward-carousel-img")).forEach(img => {
+                img.onclick = function() {
+                    forwardSlider.value = img.getAttribute("value");
+                    displayStep(img.getAttribute("value"));
+                }
+            });
+            function displayStep(i) {
+                forwardImg.src = `./diffusion-assets/trex-viz/step${i.toString().padStart(3, '0')}.svg`;
+                forwardDriftImg.src = `./diffusion-assets/trex-viz/drift${i.toString().padStart(3, '0')}.svg`;
+            }
+        </script>
+      </div>
+      <p>
+        Why might this stochastic mapping work better than the deterministic one that we get from normalizing flows?
+        One answer is that in practice, the invertibility requirement for flows is highly limiting. Not only does each layer of the flow network need to be invertible, 
+        but the determinant of the Jacobian for each layer must be fast to compute.<dt-fn><a href="https://en.wikipedia.org/wiki/Computational_complexity_of_mathematical_operations">Computing the determinant</a> 
+        of an arbitrary \(N \times N\) Jacobian is \( O(N^3) \), which is unacceptably slow. Much research focuses on finding specific functions for which this can be faster.</dt-fn> 
+        This limits what you can express with a given model size, which could be why flows weren't the first model type to scale to Stable Diffusion levels of fidelity. In contrast, 
+        denoising diffusion models only need to learn a mapping that goes in one direction.
+      </p>
+      <p>
+        Training works by adding random noise to each data point in our training set, having the model predict the noise, then minimizing the L2 loss between the 
+        prediction and the actual noise direction via gradient descent.
+      </p>
+      <p>
+        There are a few ways to sample from a pre-trained model. They boil down to:
+        <ol>
+            <li>Start with a pure noise image.</li>
+            <li>Predict the noise in it, and subtract a predefined fraction of it.</li>
+            <li>Repeat (2) many times (10-1000 depending on the sampler), get a noise-free image.</li>
+        </ol>
+      </p>
+      <p>
+        If you're like me, you may be wondering a few things:
+        <ul>
+            <li>
+                Why do we estimate the noise direction rather than the de-noised image directly? In other words, how does estimating noise help us learn the distribution?
+            </li>
+            <li>
+                Why does this process require so many steps?
+            </li>
+            <li>
+                Why are there multiple ways to sample, and what's the difference between them?
+            </li>
+        </ul>
+      </p>
+
+      <dt-byline></dt-byline>
+
+      <h1 id="section-2">2. DDPM</h1>
+      <p>
+        Let's take a look at the original approach, Denoising Diffusion Probabilistic Models<dt-cite key="ho2020denoising"></dt-cite>.
+        Newer advances build on the language and math of this paper.
+      </p>
+      <h2 id="section-2.1">2.1 Noising and de-noising</h2>
+      <p>
+        Given an input image \( \mathbf{x}_0 \), we map it to a point in the unit normal distribution by iteratively blending noise to it in a forward diffusion process over \(t=1,2,…,T\) timesteps.
+        Each timestep generates a new image by blending in a small amount of random noise to the previous one:
+        $$
+        \mathbf{x}_t = \sqrt{\alpha_t}\mathbf{x}_{t-1} + \sqrt{1-\alpha_t}\epsilon
+        $$
+
+        where:
+        <ul>
+            <li>\(\epsilon \sim \mathcal{N}(0, \mathbf{I})\)</li>
+            <li>\(\alpha_t\) is less than but close to \(1\), and \(\prod_{t=1}^T \alpha_t \approx 0\)</li>
+            <li>The square roots ensure that the variance remains the same after each step<dt-fn>We assume that the dataset is standardized, so that the variance of \(\mathbf{x}_0\) is 1 over all dimensions.</dt-fn>.</li>
+        </ul>
+      </p>
+      <p>
+        We can write the probability density of the forward step as:
+        $$
+        q(\mathbf{x}_t | \mathbf{x}_{t-1}) := \mathcal{N}(\sqrt{\alpha_t}\mathbf{x}_{t-1}, (1 - \alpha_t)\mathbf{I})
+        $$
+      </p>
+      <h4>Recurrence property</h4>
+      <p>
+        Each step depends only on the last timestep, and the noise blended in is independent of all previous noise samples. So we can expand the recurrence and derive
+        an equation to obtain \(\mathbf{x}_t\) in one step from \(\mathbf{x}_0\) by blending in a single gaussian noise vector, since sums of independent gaussians 
+        are also gaussian:
+        $$
+        \mathbf{x}_t = \sqrt{\bar\alpha_t}\mathbf{x}_0 + \sqrt{1-\bar\alpha_t}\epsilon
+        $$
+        where \(\bar\alpha_t = \prod_{i=1}^t \alpha_i\) and \(\epsilon \sim \mathcal{N}(0, \mathbf{I})\).
+
+        This is used to derive the reverse process which we want to learn, and the training objective where we predict the noise that we add to images.
+      </p>
+      <img src="./diffusion-assets/ddpm_markov_diagram.png" alt="Noising and denoising processes in DDPM" class="l-middle" />
+      <p class="caption"><i>Image via <dt-cite key="weng2021diffusion"></dt-cite><dt-cite key="ho2020denoising"></dt-cite></i>.</p>
+      <p>
+        Now consider the reverse process. Given a noisy image \( \mathbf{x}_t \), what's the distribution of the previous, less-noisy version of it \(q(\mathbf{x}_{t-1} | \mathbf{x}_t)\)?
+      </p>
+      <p>
+        This is easier if we know the original image \( \mathbf{x}_0 \). By Bayes' rule, we have:
+        $$
+        q(\mathbf{x}_{t-1} | \mathbf{x}_t, \mathbf{x}_0) = \frac{q(\mathbf{x}_t | \mathbf{x}_{t-1}) q(\mathbf{x}_{t-1} | \mathbf{x}_0) q(\mathbf{x}_0)}{q(\mathbf{x}_t | \mathbf{x}_0) q(\mathbf{x}_0)}
+        $$
+        Subbing in the distribution formulas and doing the algebra we get...
+        $$
+        q(\mathbf{x}_{t-1} | \mathbf{x}_t, \mathbf{x}_0) = \mathcal{N}(\mu(\mathbf{x}_t, \mathbf{x}_0), \Sigma(t)\mathbf{I})
+        $$
+        where
+        $$
+        \mathbf{\mu}(\mathbf{x}_t, \mathbf{x}_0) = \frac{\sqrt{\alpha_t}(1-\bar{\alpha}_{t-1})\mathbf{x}_t + \sqrt{\bar{\alpha}_{t-1}}(1-\alpha_t)\mathbf{x}_0}{1-\bar{\alpha}_t} \\
+        \Sigma(t) = \frac{(1-\alpha_t)(1-\bar{\alpha}_{t-1})}{1-\bar{\alpha}_t}
+        $$
+
+        That is, given a noisy image and the known original image, the distribution of the previous, less-noisy version of it is gaussian.
+      </p>
+      <p>
+        What can we do with this information? When we're de-noising a noisy image we won't know the original corresponding to it. We want \( q(\mathbf{x}_{t-1} | \mathbf{x}_t) \).
+      </p>
+      <p>
+        Since we have a closed form solution for \(q(\mathbf{x}_{t-1} | \mathbf{x}_t, \mathbf{x}_0)\), if we could use the entire dataset at generation time, we could use the law of total
+        probability to compute \(q(\mathbf{x}_{t-1} | \mathbf{x}_t)\) as a mixture of gaussians, but we can't (billions of images!) and moreover that would not give us the novelty 
+        we want, since if we followed it for all timesteps, we would just end up recovering the training samples. We want to learn some underlying distribution function which gives
+        us novelty in generated samples by compressing the dataset.
+      </p>
+      <h2 id="section-2.2">2.2 Learning to de-noise</h2>
+      <p>
+        It turns out that \(q(\mathbf{x}_{t-1} | \mathbf{x}_t)\) is approximately gaussian for very small amounts of noise. This is an old result from statistical physics<dt-cite key="sohldickstein2015deep"></dt-cite>.
+        This gives us a way to learn a reverse distribution: we can estimate the parameters \(\mu_\theta, \Sigma_\theta\) of a gaussian, and take the KL divergence to all of the distributions 
+        \(q(\mathbf{x}_{t-1} | \mathbf{x}_t, \mathbf{x}_0)\) for every training example \(\mathbf{x}_0\).
+      </p>
+      <p>
+        Recall that the <a href="https://en.wikipedia.org/wiki/Kullback%E2%80%93Leibler_divergence">KL divergence</a> is a metric measuring the difference between two probability distributions. 
+        It's easy to compute for us because we are computing it between two gaussians with known parameters, so it has a closed form<dt-fn>For arbitrary continuous distributions, the KL 
+        divergence requires taking an integral. This is a special case. See the formula and a short proof <a href="https://mr-easy.github.io/2020-04-16-kl-divergence-between-2-gaussian-distributions/">here</a>.</dt-fn>. 
+        And as it turns out, minimizing this gives us a distribution which is most likely to generate all our training samples.
+      </p>
+      <img src="./diffusion-assets/ddpm_kl.svg" alt="The reverse distributions q conditioned on training samples, and the distribution p that we learn." class="l-middle" style="max-width:min(600px,80vw)" />
+      <p class="caption">
+        <i>
+            The reverse distributions <span style="color:#DD5454">\(q(\mathbf{x}_{t-1} | \mathbf{x}_t, \mathbf{x}_0^{(1)})\)</span> and 
+            <span style="color:#5055CC">\(q(\mathbf{x}_{t-1} | \mathbf{x}_t, \mathbf{x}_0^{(2)})\)</span> conditioned on training samples 
+            \(\mathbf{x}_0^{(1)},\mathbf{x}_0^{(2)}\), and the <span style="color:#41BC81">distribution \(p_\theta\) that we learn</span> by minimizing KL divergence to them.
+        </i>
+      </p>
+      <div class="l-gutter caption" style="z-index: 10">
+          <p>
+            👉 We can prove that minimizing \( L \) maximizes the likelihood of generating the dataset because it optimizes a lower bound for the same, through a process called variational inference.
+          </p>
+          <p>
+              For a proof, see the derivation of \(L_\text{VLB}\) on <a href="https://lilianweng.github.io/posts/2021-07-11-diffusion-models/#reverse-diffusion-process">Lilian Weng's blog</a>.
+          </p>
+      </div>
+      <p>
+        Concretely, let our training objective be:
+        $$
+        L = \mathbb{E}_{\mathbf{x}_{0:T} \sim q}[\sum_{t=1}^TD_{KL}(q(\mathbf{x}_{t-1}|\mathbf{x}_t, \mathbf{x}_0) || p_\theta(\mathbf{x}_{t-1}|\mathbf{x}_t))]
+        $$
+
+        where \(D_{KL}(q || p_\theta)\) is an expression<dt-fn>Note the <a href="https://x.com/ari_seff/status/1303741288911638530">KL divergence is asymmetric</a>, so minimizing \(D_{KL}(q || p_\theta)\) over \(p_\theta\) (which squeezes \(q\) under \(p_\theta\)) gives a different result than \(D_{KL}(p_\theta || q)\)
+        (which does the opposite). But as we see next this doesn't ultimately matter.</dt-fn> involving the variances \(\Sigma_\theta,\Sigma(t)\) and means \(\mu_\theta,\mu(\mathbf{x}_t,\mathbf{x}_0)\) of the two gaussians.
+      </p>
+      <p>
+        Ho 2020<dt-cite key="ho2020denoising"></dt-cite> fixed the \(\Sigma_\theta\) to be equal to \(\Sigma(t)\), since they found that trying to learn it made training too unstable, and this gave good results. So in practice
+        we only learn the means \(\mu_\theta\). After substituting in the KL divergence formula for gaussians, we end up with an objective to minimize the L2 distance between estimated
+        and actual means:
+        $$
+        L = \sum_{t=1}^T\mathbb{E}_{\mathbf{x}_{0:T} \sim q}[\frac{1}{2\Sigma(t)}||\mu(\mathbf{x}_t, \mathbf{x}_0) - \mu_\theta(\mathbf{x}_t)||^2]
+        $$
+      </p>
+      <p>
+        We can simplify further and take advantage of the fact that \(\mathbf{x}_t\) can be written as a blending of \(\mathbf{x}_0\) with gaussian noise
+        \(\epsilon\). Plugging this in turns our mean prediction problem into a noise prediction problem:
+        $$
+        L = \sum_{t=1}^T\mathbb{E}_{\mathbf{x}_{0} \sim q,\epsilon}[\frac{(1-\alpha_t)^2}{2\Sigma(t)\alpha_t(1-\bar{\alpha}_t)}||\epsilon-\epsilon_\theta(\sqrt{\bar\alpha_t}\mathbf{x}_0 + \sqrt{1-\bar\alpha_t}\epsilon,t)||^2]
+        $$
+      </p>
+      <p>
+        It turns out ignoring the weighting improves the quality of results<dt-cite key="ho2020denoising"></dt-cite>. You could view this as down-weighting loss terms at small \(t\) so that the network focuses on learning the more difficult problem 
+        of denoising images with lots of noise. So the final loss function is
+        $$
+        L_\text{simple} = \mathbb{E}_{t \sim [1, T], \mathbf{x}_{0} \sim q,\epsilon}[||\epsilon-\epsilon_\theta(\sqrt{\bar\alpha_t}\mathbf{x}_0 + \sqrt{1-\bar\alpha_t}\epsilon,t)||^2]
+        $$
+
+        In code, our training loop is:
+      </p>
+    <!-- <dt-code block language="python"> -->
+        <pre class="l-middle">
+            <code class="language-python">
+def train(model, train_data, alpha_min=0.98, alpha_max=0.999, T=1000, n_epochs=5):
+    opt = torch.optim.SGD([model.parameters()], lr=0.1)
+    alpha = torch.linspace(alpha_max, alpha_min, T)
+    alpha_bar = torch.cumprod(alpha, dim=-1)
+
+    for _ in range(n_epochs):
+        for x0s in train_data:
+            eps = torch.randn_like(x0s)
+            t = torch.randint(T, (x0s.shape[0],))
+
+            xts = alpha_bar[t].sqrt() * (1.-alpha_bar[t]).sqrt()
+            eps_pred = model(xts, t)
+
+            loss = torch.nn.functional.mse_loss(eps_pred, eps)
+            loss.backward()
+            opt.step()
+            opt.zero_grad()
+            </code>
+        </pre>
+    <!-- </dt-code> -->
+
+      <h2 id="section-2.3">2.3 Sampling</h2>
+      <p>
+        Once we've learned a noise estimation model \( \epsilon_\theta(\mathbf{x}_t, t) \), we've effectively learned the reverse process. 
+        Then we can use this learned model to sample an image \( \mathbf{x}_0 \) from the image distribution by:
+        <ol>
+            <li>
+                Sampling a random noise image \(x_T \sim \mathcal{N}(0, \mathbf{I})\).
+            </li>
+            <li>
+                <p>
+                    For timesteps \(t\) from \(T\) to \(1\):
+                </p>
+                <ol type="a">
+                    <li>Predict the noise \(\hat\epsilon_t = \epsilon_\theta(\mathbf{x}_t, t)\).</li>
+                    <li>Sample the de-noised image \(\mathbf{x}_{t-1} \sim \mathcal{N}(\frac{1}{\sqrt{\alpha_t}}(\mathbf{x}_t - \frac{1 - \alpha_t}{\sqrt{1 - \bar\alpha_t}}\hat\epsilon_t), \Sigma_\theta)\).</li>
+                </ol>
+            </li>
+        </ol>
+      </p>
+      <p>
+        In code:
+      </p>
+    <!-- <dt-code block language="python"> -->
+        <pre class="l-middle">
+            <code class="language-python">
+def sample(model, img_size, alpha, alpha_bar):
+    xt = torch.randn(img_size)
+    for t in reversed(range(T)):
+        with torch.no_grad():
+            eps_pred = model(xt, time_embedding(t))
+
+        alpha_bar_t = alpha_bar[t]
+        alpha_bar_t1 = alpha_bar[t-1] if t > 0 else 1.
+        sigma = ((1.-alpha[t])*(1.-alpha_bar_t1)/(1.-alpha_bar_t)).sqrt()
+        z = torch.randn(img_size)
+        
+        mu_pred = (xt - (1.-alpha[t])/(1.-alpha_bar[t]).sqrt()*eps_pred)/alpha[t].sqrt()
+        xt = mu_pred + sigma*z
+    return xt
+            </code>
+        </pre>
+    <!-- </dt-code> -->
+
+      <h2 id="section-2.4">2.4 Summary and example</h2>
+
+      <p>
+        Let's summarize what we've learned about DDPM:
+      </p>
+      <ul>
+        <li>
+            We want to learn an underlying distribution for a dataset of images.
+        </li>
+        <li>
+            <p>
+                We do this by defining a forward noising process where we gradually turn an image \(\mathbf{x}_0\) into pure noise \(\mathbf{x}_T\) over many steps, and we 
+                learn to reverse the process by estimating the distribution of \(\mathbf{x}_{t-1}\) given \(\mathbf{x}_T\), which is feasible because:
+            </p>
+            <ul>
+                <li>
+                    It's approximately gaussian when \(T\) is large.
+                </li>
+                <li>
+                    We know exactly what the distribution is if we assume the original image is some \(\mathbf{x}_0\) from our dataset.
+                </li>
+                <li>
+                    We can use the KL divergence to ensure what we learn is as close to these known distributions as possible for every \(\mathbf{x}_0\) in our dataset.
+                </li>
+                <li>
+                    This also provably maximizes the likelihood of re-generating our dataset. 
+                </li>
+            </ul>
+        </li>
+        <li>
+            Finally, we can simplify the objective so it becomes a noise estimation problem.
+        </li>
+      </ul>
+      <p>
+        Let's train a DDPM network on a 2D dataset. We will use the <a href="http://www.thefunctionalart.com/2016/08/download-datasaurus-never-trust-summary.html">Datasaurus</a>
+        dataset<dt-fn>Inspired by tanelp's <a href="https://github.com/tanelp/tiny-diffusion">tiny-diffusion</a>.</dt-fn> of 142 points, plotted below.
+      </p>
+      <img src="./diffusion-assets/trex-viz/step000.svg" alt="Datasaurus" id="trex" class="l-middle" style="width: min(90vw, 450px)" />
+      <p>
+        The neural network will be a function from \(\mathbb{R}^2 \mapsto \mathbb{R}^2\). We'll start with a bog-standard MLP with 3 hidden layers of size 64 with ReLU activations.
+        This architecture has 12,000+ parameters, so one might think there is a high chance of memorizing the dataset (284 numbers), but as we'll see, the distribution we learn 
+        will be pretty good: it will not only fit the training samples but will have high diversity.
+      </p>
+      <p>
+        After training, we can sample 1000 points to see how well it learned the distribution:
+      </p>
+      <img src="./diffusion-assets/trex-viz/mlp_identity_zero.svg" alt="Datasaurus" id="trex-mlp-identity-zero" class="l-middle" style="width: min(90vw, 450px)" />
+      <p>
+        Oh no! That doesn't look anything like the dinosaur we wanted. What happened?
+      </p>
+      <p>
+        One problem is that we're not passing any timestep information to the model. The noise drift vectors look pretty different at higher timesteps compared to lower
+        timesteps. Let's try passing the timestep \(t=0,...,50\) normalized to between \(0\) and \(1\) to our model, which now map \(\mathbb{R}^3 \mapsto \mathbb{R}^2\).
+      </p>
+      <img src="./diffusion-assets/trex-viz/mlp_identity_linear.svg" alt="Datasaurus" id="trex-mlp-identity-linear" class="l-middle" style="width: min(90vw, 450px)" />
+      <p>
+        That's much better. But we can do better by using input encodings. These are fixed functions that transform the input before feeding them to the neural network, 
+        and they can make a big difference. We will use a <a href="https://bmild.github.io/fourfeat/">fourier encoding</a>, since we know the distribution underlying our 
+        data is like an image - a high-frequency signal in a low-dimensional (2D) space<dt-cite key="tancik2020fourfeat"></dt-cite>.
+      </p>
+      <p>
+        For an input \(D\)-dimensional point \( \mathbf{x} \), we will encode it as:
+        $$
+        \text{FourierEncoding}(\mathbf{x}) = \left[ \cos(2\pi\mathbf{Bx}), \sin(2\pi\mathbf{Bx}) \right]^T
+        $$
+
+        here \(\mathbf{B}\) is a random \(L \times D\) Gaussian matrix, where each entry is drawn independently from a normal distribution.
+        What we are doing is transforming the input space into a \(L\)-dimensional space of random frequency features. We'll set the hyperparameter \(L\)
+        to 32.
+      </p>
+      <img src="./diffusion-assets/trex-viz/mlp_fourier_fourier.svg" alt="Datasaurus" id="trex-mlp-fourier-fourier" class="l-middle" style="width: min(90vw, 450px)" />
+      <p>
+        Nice! Our distribution is looking pretty good. One more thing we can do is tweak our noising schedule. This can be crucial for performance.
+        <ul>
+            <li>
+                Our noising schedule is based on Ho 2020<dt-cite key="ho2020denoising"></dt-cite>, who use a linearly decreasing sequence of \(\alpha_t\) where \(\bar\alpha_T=\prod_{t=1}^T\alpha_t\approx0\) so that the model spends a bit more time
+                learning how to reverse lower noise levels, and the last timestep is close to pure noise. This works well for high-resolution images.
+            </li>
+            <li>
+                But our dataset is low-dimensional, and from the forward process visualization in <a href="#section-1.1">&sect;1.1</a>, it already looks a lot like noise once we get about halfway through our process, 
+                and subsequent steps don't seem to destroy much more signal.
+            </li>
+        </ul>
+      </p>
+      <img src="./diffusion-assets/noising_importance.png" alt="Noised images at different resolution with the same noise level" class="l-middle" style="width: min(90vw, 650px)" />
+      <p class="caption">
+        <i>Image via <dt-cite key="chen2023importance"></dt-cite>. The same amount of noise in different resolution images yields very different looking results, with low-res images looking much noisier than high-res ones.</i>
+      </p>
+      <p>
+        Let's adjust our schedule so that the model trains on more high-signal examples. This improves performance on lower-dimensional data while doing the opposite for higher-dimensional data<dt-cite key="chen2023importance"></dt-cite><dt-cite key="nichol2021improved"></dt-cite>.
+        It gets us our best dinosaur yet:
+      </p>
+      <div class="l-gutter caption" style="margin-right:calc((100vw - 984px) / 2); z-index: 10">
+        <p>
+            <b>Left:</b> our original and new \(\bar\alpha_t\) schedules.
+            <b>Right:</b> 1000 samples from the trained model.
+        </p>
+        <p>
+            The original schedule already didn't take us to pure noise, with \(\bar\alpha_T \approx 0.28 \). The new schedule ends at where the old schedule was halfway, at \(0.6\).
+        </p>
+      </div>
+      <div class="l-middle" style="width: min(90vw, 800px); white-space: nowrap">
+        <img src="./diffusion-assets/trex-viz/alpha_bar_modified.svg" alt="Datasaurus" style="display: inline-block; width: min(90vw, 350px)" />
+        <img src="./diffusion-assets/trex-viz/mlp_fourier_fourier_rescheduled.svg" alt="Datasaurus" id="trex-mlp-fourier-fourier-rescheduled" style="display: inline-block; width: min(90vw, 350px)" />
+      </div>
+      <p>
+        
+      </p>
+
+      <dt-byline></dt-byline>
+
+      <h1 id="section-3">3. Advances</h1>
+      <br/>
+      <h2 id="section-3.1">3.1 Faster generation</h2>
+      <p>
+        A major disadvantage of diffusion when it was first invented was the generation speed due to the 
+        DDPM assumption that the reverse distribution is gaussian, which is only true for large \(T\).
+        Since then, many techniques to speed up generation have been developed, some of which can be used out-of-the-box on models pre-trained using the DDPM objective, 
+        while others require new models to be trained.
+      </p>
+      <h3>Score matching and faster samplers</h3>
+      <p>
+        Diffusion has a remarkable connection to differential equations, which enabled many faster samplers to be created as we were able to tap into the rich literature 
+        of the latter.
+      </p>
+      <p>
+        First, it turns out that the noise direction that we learn to estimate given a noisy input \(\mathbf{x}_t\) is equivalent<dt-fn>
+        For a proof, I like this <a href="https://youtu.be/i2qSxMVeVLI?si=Ntze5iZj7lURrx14&t=449">video from Jia-Bin Huang</a> or <a href="https://calvinyluo.com/2022/08/26/diffusion-tutorial.html#mjx-eqn%3Aeq%3A109">blog post from Calvin Luo</a>.</dt-fn>
+        to the gradient of the log-likelihood of the forward process generating \(\mathbf{x}_t\) (also known as the <b>score</b> of \(\mathbf{x}_t\)) up to a constant which depends on timestep<dt-cite key="ho2020denoising"></dt-cite>:
+        $$
+        \nabla_{\mathbf{x}_t} \log q(\mathbf{x}_t) = -\frac{1}{\sqrt{1-\bar\alpha_t}}\hat\epsilon_\theta(\mathbf{x}_t, t)
+        $$
+        This is interesting by itself. To see why, ignore the forward process for a second and assume that we have learned the score for \(\mathbf{x}_0\). 
+        If we imagine that \(\mathbf{x}_0\) has nonzero probability everywhere in image space, then the score would provide a vector field over the entire
+        space that would tell us in what direction we should walk if we want to move towards the <a href="https://stats.stackexchange.com/a/491555/411790">modes</a>
+        of the distribution. But in real life \(\mathbf{x}_0\) does not have nonzero probability everywhere. If we add noise to it, we can spread density out to 
+        where there is none, but keep the modes the same.
+      </p>
+      <img src="./diffusion-assets/score_matching.png" alt="Sampling by following the score in a mixture of gaussians" class="l-middle" style="width: min(90vw, 600px)" />
+      <p class="caption">
+        <i>
+            From <a href="https://calvinyluo.com/2022/08/26/diffusion-tutorial.html">Calvin Luo's blog</a>: Sampling by following the score function in a mixture of gaussians. 
+            These sampling trajectories all start from the center and have noise injected at each step. In the context of DDPMs, the noise is needed to model the reverse 
+            distribution correctly, while in the context of score-based models, the noise is needed to avoid having sampling just converge on a mode.
+        </i>
+      </p>
+      <p>
+        This formed the basis for <a href="https://arxiv.org/abs/1907.05600">noise-conditioning score networks</a>, which learned the score of a progressively noised dataset 
+        and generated new samples by iteratively following the score field. If that sounds familiar, that's because it is basically the same as diffusion!
+      </p>
+      <p>
+        Second, it turns out that the forward diffusion process can be described by something called a stochastic differential equation (SDE) which tells us how the data 
+        distribution evolves over time as we add noise to it. And here is the magic part: there exists an ODE that describes a deterministic process whose time-dependent
+        distributions are exactly the same as the stochastic process at each timestep, with a simple closed form involving the score function from above<dt-fn>See <a href="https://ericmjl.github.io/score-models/notebooks/04-diffeq.html#probability-flow-odes">this introduction</a> from Eric Ma for details.</dt-fn>!
+      </p>
+      <img src="./diffusion-assets/sde_ode_comparison.png" alt="Comparison of reverse SDE and ODE trajectories in diffusion sampling" class="l-middle" style="width: min(90vw, 600px)" />
+      <p class="caption">
+        <i>
+            Comparison of reverse SDE and ODE trajectories in a diffusion of a 1-dimensional dataset. The x-axis represents the timestep \(t\), while the y-axis represents the value of \(\mathbf{x}_t\).
+            The color is the probability density of that value at that timestep. Notice how much straighter the ODE trajectory is, which suggests a way to "speed" sampling by stepping in larger increments.
+        </i>
+      </p>
+      <p>
+        Not only does this mean that there exists a fully deterministic<dt-fn>E.g. without injecting noise</dt-fn> way to sample from any given pretrained diffusion model,
+        but it also means we can use off-the-shelf ODE solvers to do the sampling for us. Whereas DDPM can take up to 1000 steps to sample a high-quality result in Stable Diffusion, 
+        a sampler based on the Euler method of solving ODEs can yield high quality results in as little as 10 steps. Karras 2022<dt-cite key="karras2022elucidating"></dt-cite> 
+        (<a href="https://www.youtube.com/watch?v=T0Qxzf0eaio">video</a>) provide a great overview of the tradeoffs of these and how stochasticity of samplers like DDPM can still 
+        be important in some cases.
+      </p>
+      <h2 id="section-3.2">3.2 Conditional generation</h2>
+      <p>
+        Given a model trained on animal images, how do I generate only cats?
+      </p>
+      <p>
+        In principle, it's possible to model any type of conditional probability distribution \(p(\mathbf{x} | y)\) by training a diffusion 
+        model \(\epsilon_\theta(\mathbf{x}_t, t, y)\) with pairs \(\mathbf{x}_0, y\) from the dataset. This was done by Ho 2021<dt-cite key="ho2021cascaded"></dt-cite>, 
+        who trained a class-conditional diffusion model on ImageNet.
+        The label \(y\) can also be a text embedding, a segmentation mask, or any other conditioning information.
+      </p>
+      <img src="./diffusion-assets/class_conditional_imagenet.png" alt="Class-conditioned ImageNet generations" class="l-middle" style="width: min(90vw, 450px)" />
+      <p class="caption">
+        <i>Class-conditional generations for ImageNet from <dt-cite key="ho2021cascaded"></dt-cite>.</i>
+      </p>
+      <p>
+        However, the label can sometimes lead to samples that are not realistic or lack diversity if the model has not seen enough samples from 
+        \(p(\mathbf{x} | y)\) for a particular \(y\). So we often want to tune how much the model “follows” the label during generation. 
+        This leads to the concept of <b>guidance</b>.
+      </p>
+      <h3>Classifier guidance</h3>
+      <p>
+        Given an image \(\mathbf{x}_0\), a classifier gives a probability distribution
+        \(p_\phi(y|\mathbf{x}_0)\) that it lies in some class \(y\). If we take the gradient of that with respect to the input,
+        we get a vector \(\nabla_{\mathbf{x}_0}p_\phi(y|\mathbf{x}_0)\) which we can use to push the image
+        <dt-fn>This is similar to how <a href="https://research.google/blog/inceptionism-going-deeper-into-neural-networks/">Google's DeepDream</a> worked back in the day.</dt-fn> 
+        towards our class \(y\).
+      </p>
+      <p>
+        What if each sampling step, we added the classifier gradient with respect to \(\mathbf{x}_t\) 
+        to our estimated mean? Hopefully, the diffusion will ensure the sample will land in some plausible region of image space. 
+        To ensure our classifier knows what to do with the (potentially very noisy) image \(\mathbf{x}_t\), we'll train it on noisy images.
+      </p>
+      <p>
+        This turns out really well experimentally and mathematically. For DDPM, if we set our reverse step estimated mean to
+        $$
+        \mu_{\theta,\phi}=\mu_\theta + \sigma_t^2 * \nabla_{\mathbf{x}_t}\log p_\phi(y | \mathbf{x}_t)|_{\mathbf{x}_t=\mu_\theta}
+        $$
+
+        Then it can be shown to a first order approximation<dt-cite key="dhariwal2021diffusion"></dt-cite> that we're sampling from the distribution
+        $$
+        p_{\theta,\phi}(\mathbf{x}_{t}|\mathbf{x}_{t+1}, y) \propto p_\theta(\mathbf{x}_{t}|\mathbf{x}_{t+1})p_\phi(y|\mathbf{x}_t)
+        $$
+      </p>
+      <p>
+        The classifier used doesn't need to be particularly high-quality. For example, here are classifier-guided examples for the "T-shirt" class on Fashion-MNIST using
+        a classifier with 40% accuracy:
+      </p>
+      <img src="./diffusion-assets/fashion_mnist_cg.png" alt="Classifier-guided examples for the 'T-shirt' class on Fashion-MNIST" class="l-middle" style="width: min(90vw, 450px)" />
+      <p>
+        The level of guidance parameter <code>cg</code> scales the classifier gradient. More guidance 
+        leads to stronger class characteristics but possibly less realism.
+      </p>
+      <h3>Classifier-free guidance</h3>
+      <p>
+        Training a classifier takes extra work. Can we do guidance without one? Let's apply Bayes' rule to our class gradient:
+        $$
+        \nabla_{\mathbf{x}_t}\log p(y | \mathbf{x}_t) = \nabla_{\mathbf{x}_t}\log p(\mathbf{x}_t | y) - \nabla_{\mathbf{x}_t}\log p(\mathbf{x}_t)
+        $$
+        We have turned our class gradient into two score (<a href="#section-3.1">&sect;3.1</a>) functions:
+        <ol>
+            <li>
+                \(\nabla_{\mathbf{x}_t}\log p(\mathbf{x}_t | y)\) is the score of the data \(\mathbf{x}_t\) conditioned on class \(y\).
+            </li>
+            <li>
+                \(\nabla_{\mathbf{x}_t}\log p(\mathbf{x}_t)\) is the score of all the data \(\mathbf{x}_t\).
+            </li>
+        </ol>
+      </p>
+      <p>
+        We have seen that denoising diffusion models learn the score of their training data, so this gives us an approach for guidance without a classifier:
+        <ol>
+            <li>Train a single diffusion model on every training sample \(\mathbf{x}_0\) twice: once paired with its class label \(y\), and once paired with a null class label.</li>
+            <li>When sampling from the model, call it twice: once with the desired class label and once without, then take the difference and use that as
+                our guidance vector.</li>
+        </ol>
+      </p>
+      <h3>Image conditioning</h3>
+      <h4>Image-to-image</h4>
+      <p>
+        Image-to-image doesn't require retraining a model. Instead, given an input image,
+        we can add noise to the image according to the desired strength of the conditioning image (less noise for stronger conditioning), then de-noise it.
+      </p>
+      <h4>Inpainting</h4>
+      <p>
+        Inpainting is filling in a masked part of an image. One idea to implement this would be via image-to-image: rather than
+        adding noise to the whole image, we just add it to the masked part. But this doesn't work because at any \(t > 0\), the denoising model doesn't know what to do with the 
+        non-noisy parts of the image.
+      </p>
+      <img src="./diffusion-assets/repaint.png" class="l-middle" style="width: min(90vw, 450px)" />
+      <p class="caption">
+        <i>Image via <dt-cite key="lugmayr2022repaint"></dt-cite>.</i>
+      </p>
+      <p>
+        Instead, what works is to add noise to both the masked and un-masked parts of the image, and pass that in as \(\mathbf{x}_T\).
+        Then at each subsequent sampling step \(t\), given \(\mathbf{x}_t\), we copy the un-masked parts of the original image, noise them according to \(t\), 
+        then place them over \(\mathbf{x}_t\) and use that as input into the denoiser.
+      </p>
+      <h4>Text-to-image</h4>
+      <img src="./diffusion-assets/imagen-high-level.jpg" alt="Imagen at a high level" class="l-middle" style="width: min(90vw, 450px)" />
+      <p class="caption">
+        <i>Imagen<dt-cite key="saharia2022photorealistic"></dt-cite> at a high-level.</i>
+      </p>
+      <p>
+        Text-to-image is conditional generation with text embedding labels. OpenAI's Dall-E trained an encoding model called CLIP to
+        project both images and text into the same space<dt-cite key="ramesh2022hierarchical"></dt-cite>, but a multimodal embedding space is not strictly required.
+        Google's Imagen model used the T5 large language model to encode text into embeddings<dt-cite key="saharia2022photorealistic"></dt-cite>.
+        As long as the embeddings are a rich enough representation, any can be used.
+      </p>
+      <h2 id="section-3.3">3.3 Data</h2>
+      <p>
+        While not specific to diffusion, no discussion of generative models is complete without mentioning the data they were trained on. 
+        This section will cover data used for image generation models.
+      </p>
+      <div class="l-middle">
+          <img src="./diffusion-assets/laion_cat.png" alt="Searching for 'cat' in LAION" style="width: min(90vw, 600px)" />
+      </div>
+      <p class="caption">
+        <i>Searching for 'cat' in LAION.</i>
+      </p>
+      <div class="l-middle">
+          <img src="./diffusion-assets/laion_aesthetic_cat.png" alt="Searching for 'cat' in LAION aesthetic" style="width: min(90vw, 600px)" />
+      </div>
+      <p class="caption">
+        <i>Searching for 'cat' in <a href="https://github.com/LAION-AI/laion-datasets/blob/main/laion-aesthetic.md">LAION-aesthetic</a>.</i>
+      </p>
+      <p>
+        <ul>
+            <li>
+                Dall-E 1 was trained on 250 million text-image pairs, and Dall-E 2 was trained on 650 million. The dataset is closed source.
+            </li>
+            <li>
+                According to the <a href="https://huggingface.co/CompVis/stable-diffusion">HuggingFace model card</a>, Stable Diffusion 1 was trained on LAION-2B-en (2 billion pairs), then fine-tuned on 170 million pairs from LAION-5B.
+            </li>
+            <li>
+                Subsequent checkpoints of Stable Diffusion 1 are fine-tuned on subsets of LAION-5B selected for “aesthetics”<dt-fn>From the <a href="https://github.com/LAION-AI/laion-datasets/blob/main/laion-aesthetic.md">LAION-aesthetic readme</a>, as automatically labeled by a linear regression on CLIP trained on 4000 hand-labelled examples.</dt-fn>. See <a href="https://waxy.org/2022/08/exploring-12-million-of-the-images-used-to-train-stable-diffusions-image-generator/">this blog post</a> for a look inside. 
+            </li>
+            <li>
+                LAION<dt-cite key="schuhmann2022laion5b"></dt-cite> itself is derived from the Common Crawl. LAION-400M was released in August 2021 and was an attempt to recreate the process used by OpenAI
+                to train the CLIP model. The developers collected all HTML image tags that had alt-text attributes, and treated the latter as the image captions,
+                using CLIP to discard those which did not appear to match their content.
+            </li>
+            <li>
+                Some users have also compiled lists of artists that appear in LAION. For example see <a href="https://docs.google.com/spreadsheets/d/1_jgQ9SyvUaBNP1mHHEzZ6HhL_Es1KwBKQtnpnmWW82I/">MisterRuffian's Latent Artist Encyclopedia</a>.
+                The website <a href="https://haveibeentrained.com/">haveibeentrained.com</a> also allows users to check if their images are in LAION or other popular datasets.
+            </li>
+        </ul>
+      </p>
+      <p>
+        A major component of the AI art backlash is the ethics of collecting art for datasets like LAION and training image generation models on them without
+        the consent of the artists, especially since image models can pose a direct threat to the livelihoods of those artists. However, there have been efforts to train
+        competitive image generation models more ethically<dt-fn>Simon Willison calls these "vegan" models.</dt-fn>. For example, <a href="https://www.adobe.com/sensei/generative-ai/firefly.html">Adobe Firefly</a> is 
+        supposed to<dt-fn>Except for a <a href="https://www.bloomberg.com/news/articles/2024-04-12/adobe-s-ai-firefly-used-ai-generated-images-from-rivals-for-training">recent scandal</a> where Firefly was trained on some Midjourney images.</dt-fn> 
+        be trained only on licensed content, such as Adobe Stock, and public domain content where copyright has expired. Additionally, Stable Diffusion 3 allowed artists to opt-out of 
+        having their images be used for training, with over <a href="https://the-decoder.com/artists-remove-80-million-images-from-stable-diffusion-3-training-data">80 million images removed</a> as a result.
+      </p>
+      <h3>Data poisoning</h3>
+      <img src="./diffusion-assets/nightshade.png" alt="Nightshade" class="l-middle" style="width: min(90vw, 450px)" />
+      <p>
+        Nightshade<dt-cite key="shan2024nightshade"></dt-cite> is an example of a data poisoning attack against image generation models which received attention during the AI art backlash.
+        Models are trained on billions of images, but for a given concept there might only be dozens. The idea of Nightshade is to poison data on a concept-specific basis.
+      </p>
+      <p>
+        The authors demonstrate an attack against Stable Diffusion XL using 50 images modified to cause the model to output a cow for every mention of “car” in its prompts. The modification is engineered to be as un-noticeable to the human eye as possible, by optimizing a multi-objective function involving perceptual loss.
+      </p>
+      <p>
+        An initial attack requires access to a model's feature extractor. The authors then examine how an attack based on 1 of 4 models performs on all the others, and say the results show their attack will generalize to models besides the initial model.
+      </p>
+      
+      <dt-byline></dt-byline>
+      <h1 id="section-4">4. Beyond images</h1>
+      <br />
+      <h2 id="section-4.1">4.1 Audio, video, and 3D</h2>
+      <p>
+        <a href="https://github.com/riffusion/riffusion">Riffusion</a> was an early music generation model capable of generating twelve-second long songs, notable because it was made by fine-tuning 
+        Stable Diffusion to output spectrogram images. <a href="https://sonauto.ai/">Sonauto</a> is a more recent and controllable model built on <a href="https://arxiv.org/abs/2212.09748">diffusion transformers</a>, capable of generating 1:35-long songs
+        with coherent lyrics.
+      </p>
+      <div class="l-middle">
+          <video controls width="240" src="./diffusion-assets/sora_1x.mp4" style="width: min(90vw, 240px)"></video>
+          <video controls width="240" src="./diffusion-assets/sora_4x.mp4" style="width: min(90vw, 240px)"></video>
+          <video controls width="240" src="./diffusion-assets/sora_32x.mp4" style="width: min(90vw, 240px)"></video>
+      </div>
+      <p class="caption">
+        <i><b>From left to right:</b> scaling compute 1x, 4x, and 32x with Sora.</i>
+      </p>
+      <p>
+        <a href="https://openai.com/index/video-generation-models-as-world-simulators/">OpenAI's Sora</a> and <a href="https://deepmind.google/technologies/veo/">Google's Veo</a> are diffusion transformer video generation models
+        capable of generating minute-long 1080p video clips from text prompts. At a high level, Sora works by decomposing videos into
+        spacetime patches, then learning to denoise patches.
+      </p>
+      <p>
+        A key insight of the Sora technical report is that diffusion transformers scale for video generation,
+        and that performance scales with compute<dt-fn>OpenAI did not clarify what "compute" means in this context (dataset size, model size, or training time).</dt-fn>.
+        Both models support various video editing tasks such as masked editing, creating perfectly looping video, animating static images, extending videos forwards or backwards in time, etc.
+        They build on past video diffusion work like <a href="https://imagen.research.google/video/">Imagen Video</a> (2022). Autoregressive models like <a href="https://sites.research.google/videopoet/">VideoPoet</a> (2024) 
+        are an alternative to diffusion in this space.
+      </p>
+      <img src="./diffusion-assets/stable_video_3d.webp" alt="Stable Video 3D" class="l-middle" style="width: min(90vw, 800px)" />
+      <p>
+        One remarkable aspect of 2D diffusion models is that they implicitly learn some 3D features like correspondences<dt-cite key="tang2023emergent"></dt-cite>.
+        <a href="https://dreamfusion3d.github.io/">DreamFusion</a> (2022) exploited this to generate 3D models from text by using a text-to-image diffusion model as a prior to guide a gradient-descent based
+        3D reconstruction algorithm<dt-fn>They propose something called Score Distillation Sampling to allow the image model to provide a loss for a differentiable renderer. Surprisingly, dumber 
+        techniques like <a href="https://qjfeng.net/FDGaussian/">generating multiple views by clever prompting of the text-to-image model</a> can also yield decent, though lower-quality outputs.</dt-fn>. <a href="https://arxiv.org/abs/2403.12008">Stable Video 3D</a> (2024)
+        is a more recent work which uses video diffusion for improved multi-view consistency. Such models still rely on 3D reconstruction algorithms like photogrammetry, 3D gaussian splatting, or neural radiance fields to generate the 3D representation,
+        possibly due to the relative sparsity of 3D data<dt-fn><a href="https://x.com/GeorgeCrudo/status/1771975549164122177">From Twitter</a>, 3D artists have learned from 2D artists how important ownership of their data is, so if this is going to change, 
+        it must do so in a more creator-friendly way.</dt-fn>.
+      </p>
+      <h2 id="section-4.2">4.2 Life sciences</h2>
+      <p>
+        Diffusion models are finding many applications in medicine and biology. For example, performing partial CT and MRI scans
+        greatly reduces patient exposure to radiation and increases comfort, but is challenging because it requires reconstructing full scans from 
+        partial data. Diffusion models have advanced the state-of-the-art in medical image reconstruction, providing superior performance and generalization
+        to supervised methods<dt-cite key="song2022solving"></dt-cite>.
+      </p>
+      <video class="l-middle" controls width="240" src="./diffusion-assets/alphafold_720.mov" style="width: min(90vw, 600px)"></video>
+      <p class="caption">
+        <i>A structure predicted by AlphaFold 3. Ground truth shown in gray.</i>
+      </p>
+      <p>
+        Diffusion is also state-of-the-art in protein structure prediction, with DeepMind's <a href="https://blog.google/technology/ai/google-deepmind-isomorphic-alphafold-3-ai-model/">AlphaFold 3</a> using a diffusion-based architecture and
+        showing significant improvements over both previous versions and specialized tools<dt-cite key="abramson2024accurate"></dt-cite>. Given an input list
+        of molecules, AlphaFold 3 reveals how they fit together by generating their joint 3D structure, starting with a cloud of atoms and iteratively refining
+        to a final molecular structure.
+      </p>
+      <p>
+        Beyond AlphaFold, other applications of diffusion in computational biology include single-cell data analysis, drug and small molecule design, and protein-ligand interaction<dt-cite key="guo2023diffusion"></dt-cite>.
+      </p>
+      <h2 id="section-4.3">4.3 Robotics</h2>
+      <div class="l-middle">
+          <iframe width="560" height="315" src="https://www.youtube.com/embed/w-CGSQAO5-Q?si=1VGVkp74WMc1zKne" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+      </div>
+      <p class="caption">
+        <i>
+            Video by Toyota Research Institute on how diffusion is enabling breakthroughs in robotics. 
+            See their <a href="https://medium.com/toyotaresearch/tris-robots-learn-new-skills-in-an-afternoon-here-s-how-2c30b1a8c573">blog post</a> for more.
+        </i>
+      </p>
+      <p>
+        To interact with the real world, robots must be flexible and capable of
+        a huge range of physical behaviors. Traditional approaches to get robots to do things like open doors or tie shoelaces involves
+        explicitly programming numerous edge cases and ways to recover from them. While this works
+        for controlled settings like factories, it does not scale. 
+      </p>
+      <p>
+        <i>Policy learning from demonstration</i> is a more scalable approach where
+        robots are instead taught how to perform tasks via human demonstrations, usually done by a human controlling the robot motors via teleoperation.
+      </p>
+      <p>
+        This may require anywhere from a dozen to hundreds of demonstrations, after which the robot is able to learn how to generate actions 
+        conditioned on sensor observations and possibly natural language prompts. Diffusion models are state-of-the-art
+        policy generation models, showing substantial improvements over previous techniques, with powerful advantages like gracefully handling 
+        multimodal action distributions, being suitable for high-dimensional action spaces, and exhibiting impressive training stability<dt-cite key="chi2024diffusion"></dt-cite>. 
+      </p>
+    </dt-article>
+  
+    <dt-appendix>
+    </dt-appendix>
+  
+    <script type="text/bibliography">
+        @misc{grover2018flowgan,
+            title={Flow-GAN: Combining Maximum Likelihood and Adversarial Learning in Generative Models}, 
+            author={Aditya Grover and Manik Dhar and Stefano Ermon},
+            year={2018},
+            eprint={1705.08868},
+            archivePrefix={arXiv},
+            primaryClass={cs.LG}
+        }
+        @misc{sohldickstein2015deep,
+            title={Deep Unsupervised Learning using Nonequilibrium Thermodynamics}, 
+            author={Jascha Sohl-Dickstein and Eric A. Weiss and Niru Maheswaranathan and Surya Ganguli},
+            year={2015},
+            eprint={1503.03585},
+            archivePrefix={arXiv},
+            primaryClass={cs.LG}
+        }
+        @misc{ho2020denoising,
+            title={Denoising Diffusion Probabilistic Models}, 
+            author={Jonathan Ho and Ajay Jain and Pieter Abbeel},
+            year={2020},
+            eprint={2006.11239},
+            archivePrefix={arXiv},
+            primaryClass={cs.LG}
+        }
+        @misc{ho2021cascaded,
+            title={Cascaded Diffusion Models for High Fidelity Image Generation}, 
+            author={Jonathan Ho and Chitwan Saharia and William Chan and David J. Fleet and Mohammad Norouzi and Tim Salimans},
+            year={2021},
+            eprint={2106.15282},
+            archivePrefix={arXiv},
+            primaryClass={cs.CV}
+        }
+        @article{weng2021diffusion,
+            title   = "What are diffusion models?",
+            author  = "Weng, Lilian",
+            journal = "lilianweng.github.io",
+            year    = "2021",
+            month   = "Jul",
+            url     = "https://lilianweng.github.io/posts/2021-07-11-diffusion-models/"
+        }
+        @article{tancik2020fourfeat,
+            title={Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains},
+            author={Matthew Tancik and Pratul P. Srinivasan and Ben Mildenhall and Sara Fridovich-Keil and Nithin Raghavan and Utkarsh Singhal and Ravi Ramamoorthi and Jonathan T. Barron and Ren Ng},
+            journal={NeurIPS},
+            year={2020}
+        }
+        @misc{nichol2021improved,
+            title={Improved Denoising Diffusion Probabilistic Models}, 
+            author={Alex Nichol and Prafulla Dhariwal},
+            year={2021},
+            eprint={2102.09672},
+            archivePrefix={arXiv},
+            primaryClass={cs.LG}
+        }
+        @misc{dhariwal2021diffusion,
+            title={Diffusion Models Beat GANs on Image Synthesis}, 
+            author={Prafulla Dhariwal and Alex Nichol},
+            year={2021},
+            eprint={2105.05233},
+            archivePrefix={arXiv},
+            primaryClass={cs.LG}
+        }
+        @misc{chen2023importance,
+            title={On the Importance of Noise Scheduling for Diffusion Models}, 
+            author={Ting Chen},
+            year={2023},
+            eprint={2301.10972},
+            archivePrefix={arXiv},
+            primaryClass={cs.CV}
+        }
+        @misc{karras2022elucidating,
+            title={Elucidating the Design Space of Diffusion-Based Generative Models}, 
+            author={Tero Karras and Miika Aittala and Timo Aila and Samuli Laine},
+            year={2022},
+            eprint={2206.00364},
+            archivePrefix={arXiv},
+            primaryClass={cs.CV}
+        } 
+        @misc{rombach2022highresolution,
+            title={High-Resolution Image Synthesis with Latent Diffusion Models}, 
+            author={Robin Rombach and Andreas Blattmann and Dominik Lorenz and Patrick Esser and Björn Ommer},
+            year={2022},
+            eprint={2112.10752},
+            archivePrefix={arXiv},
+            primaryClass={cs.CV}
+        }
+        @misc{ramesh2022hierarchical,
+            title={Hierarchical Text-Conditional Image Generation with CLIP Latents}, 
+            author={Aditya Ramesh and Prafulla Dhariwal and Alex Nichol and Casey Chu and Mark Chen},
+            year={2022},
+            eprint={2204.06125},
+            archivePrefix={arXiv},
+            primaryClass={cs.CV}
+        }
+        @misc{saharia2022photorealistic,
+            title={Photorealistic Text-to-Image Diffusion Models with Deep Language Understanding}, 
+            author={Chitwan Saharia and William Chan and Saurabh Saxena and Lala Li and Jay Whang and Emily Denton and Seyed Kamyar Seyed Ghasemipour and Burcu Karagol Ayan and S. Sara Mahdavi and Rapha Gontijo Lopes and Tim Salimans and Jonathan Ho and David J Fleet and Mohammad Norouzi},
+            year={2022},
+            eprint={2205.11487},
+            archivePrefix={arXiv},
+            primaryClass={cs.CV}
+        }
+        @misc{schuhmann2022laion5b,
+            title={LAION-5B: An open large-scale dataset for training next generation image-text models}, 
+            author={Christoph Schuhmann and Romain Beaumont and Richard Vencu and Cade Gordon and Ross Wightman and Mehdi Cherti and Theo Coombes and Aarush Katta and Clayton Mullis and Mitchell Wortsman and Patrick Schramowski and Srivatsa Kundurthy and Katherine Crowson and Ludwig Schmidt and Robert Kaczmarczyk and Jenia Jitsev},
+            year={2022},
+            eprint={2210.08402},
+            archivePrefix={arXiv},
+            primaryClass={cs.CV}
+        }
+        @misc{lugmayr2022repaint,
+            title={RePaint: Inpainting using Denoising Diffusion Probabilistic Models}, 
+            author={Andreas Lugmayr and Martin Danelljan and Andres Romero and Fisher Yu and Radu Timofte and Luc Van Gool},
+            year={2022},
+            eprint={2201.09865},
+            archivePrefix={arXiv},
+            primaryClass={cs.CV}
+        }
+        @misc{shan2024nightshade,
+            title={Nightshade: Prompt-Specific Poisoning Attacks on Text-to-Image Generative Models}, 
+            author={Shawn Shan and Wenxin Ding and Josephine Passananti and Stanley Wu and Haitao Zheng and Ben Y. Zhao},
+            year={2024},
+            eprint={2310.13828},
+            archivePrefix={arXiv},
+            primaryClass={cs.CR}
+        }
+        @misc{schuhmann2022laion5b,
+            title={LAION-5B: An open large-scale dataset for training next generation image-text models}, 
+            author={Christoph Schuhmann and Romain Beaumont and Richard Vencu and Cade Gordon and Ross Wightman and Mehdi Cherti and Theo Coombes and Aarush Katta and Clayton Mullis and Mitchell Wortsman and Patrick Schramowski and Srivatsa Kundurthy and Katherine Crowson and Ludwig Schmidt and Robert Kaczmarczyk and Jenia Jitsev},
+            year={2022},
+            eprint={2210.08402},
+            archivePrefix={arXiv},
+            primaryClass={cs.CV}
+        }
+        @misc{tang2023emergent,
+            title={Emergent Correspondence from Image Diffusion}, 
+            author={Luming Tang and Menglin Jia and Qianqian Wang and Cheng Perng Phoo and Bharath Hariharan},
+            year={2023},
+            eprint={2306.03881},
+            archivePrefix={arXiv},
+            primaryClass={cs.CV}
+        }
+        @misc{guo2023diffusion,
+            title={Diffusion Models in Bioinformatics: A New Wave of Deep Learning Revolution in Action}, 
+            author={Zhiye Guo and Jian Liu and Yanli Wang and Mengrui Chen and Duolin Wang and Dong Xu and Jianlin Cheng},
+            year={2023},
+            eprint={2302.10907},
+            archivePrefix={arXiv},
+            primaryClass={cs.LG}
+        }
+        @misc{song2022solving,
+            title={Solving Inverse Problems in Medical Imaging with Score-Based Generative Models}, 
+            author={Yang Song and Liyue Shen and Lei Xing and Stefano Ermon},
+            year={2022},
+            eprint={2111.08005},
+            archivePrefix={arXiv},
+            primaryClass={eess.IV}
+        }
+        @article{abramson2024accurate,
+            title={Accurate structure prediction of biomolecular interactions with AlphaFold 3},
+            author={Abramson, Josh and Adler, Jonas and Dunger, Jack and Evans, Richard and Green, Tim and Pritzel, Alexander and Ronneberger, Olaf and Willmore, Lindsay and Ballard, Andrew J and Bambrick, Joshua and others},
+            journal={Nature},
+            pages={1--3},
+            year={2024},
+            publisher={Nature Publishing Group UK London}
+        }
+        @misc{chi2024diffusion,
+            title={Diffusion Policy: Visuomotor Policy Learning via Action Diffusion}, 
+            author={Cheng Chi and Zhenjia Xu and Siyuan Feng and Eric Cousineau and Yilun Du and Benjamin Burchfiel and Russ Tedrake and Shuran Song},
+            year={2024},
+            eprint={2303.04137},
+            archivePrefix={arXiv},
+            primaryClass={cs.RO}
+        }
+          
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement(document.body);
+      });
+      const toc = document.getElementById("toc");
+      const sections = document.querySelectorAll(`[id^=section-]`);
+      for (let section of sections) {
+        const h = section.tagName;
+        const title = section.textContent;
+        const id = section.id;
+        const a = document.createElement("a");
+        a.href = `#${id}`;
+        a.textContent = title;
+        const li = document.createElement("li");
+        li.classList.add(`toc-${h}`);
+        for (let i = 0; i < id.length; i++) {
+            if (id[i] === ".") {
+                const tab = document.createElement("span");
+                tab.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+                li.appendChild(tab);
+            }
+        }
+        li.appendChild(a);
+        toc.appendChild(li);
+      }
+    </script>
+  </toyb-post>
