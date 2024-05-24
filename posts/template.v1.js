@@ -3830,6 +3830,7 @@ var frontMatter = function(dom, data) {
 
   data.title = localData.title ? localData.title : "Untitled";
   data.description = localData.description ? localData.description : "No description.";
+  data.publishedDate = localData.published ? new Date(localData.published) : null;
 
   data.authors = localData.authors ? localData.authors : [];
 
@@ -6055,7 +6056,28 @@ var mustache = createCommonjsModule(function (module, exports) {
 
 var html$2 = "\n<style>\n  dt-byline {\n    font-size: 12px;\n    line-height: 18px;\n    display: block;\n    border-top: 1px solid rgba(0, 0, 0, 0.1);\n    border-bottom: 1px solid rgba(0, 0, 0, 0.1);\n    color: rgba(0, 0, 0, 0.5);\n    padding-top: 12px;\n    padding-bottom: 12px;\n  }\n  dt-article.centered dt-byline {\n    text-align: center;\n\n  }\n  dt-byline a,\n  dt-article dt-byline a {\n    text-decoration: none;\n    border-bottom: none;\n  }\n  dt-article dt-byline a:hover {\n    text-decoration: underline;\n    border-bottom: none;\n  }\n  dt-byline .authors {\n    text-align: left;\n  }\n  dt-byline .name {\n    display: inline;\n    text-transform: uppercase;\n  }\n  dt-byline .affiliation {\n    display: inline;\n  }\n  dt-byline .date {\n    display: block;\n    text-align: left;\n  }\n  dt-byline .year, dt-byline .month {\n    display: inline;\n  }\n  dt-byline .citation {\n    display: block;\n    text-align: left;\n  }\n  dt-byline .citation div {\n    display: inline;\n  }\n\n  @media(min-width: 768px) {\n    dt-byline {\n    }\n  }\n\n  @media(min-width: 1080px) {\n    dt-byline {\n      border-bottom: none;\n      margin-bottom: 70px;\n    }\n\n    dt-byline a:hover {\n      color: rgba(0, 0, 0, 0.9);\n    }\n\n    dt-byline .authors {\n      display: inline-block;\n    }\n\n    dt-byline .author {\n      display: inline-block;\n      margin-right: 12px;\n      /*padding-left: 20px;*/\n      /*border-left: 1px solid #ddd;*/\n    }\n\n    dt-byline .affiliation {\n      display: block;\n    }\n\n    dt-byline .author:last-child {\n      margin-right: 0;\n    }\n\n    dt-byline .name {\n      display: block;\n    }\n\n    dt-byline .date {\n      border-left: 1px solid rgba(0, 0, 0, 0.1);\n      padding-left: 15px;\n      margin-left: 15px;\n      display: inline-block;\n    }\n    dt-byline .year, dt-byline .month {\n      display: block;\n    }\n\n    dt-byline .citation {\n      border-left: 1px solid rgba(0, 0, 0, 0.15);\n      padding-left: 15px;\n      margin-left: 15px;\n      display: inline-block;\n    }\n    dt-byline .citation div {\n      display: block;\n    }\n  }\n</style>\n\n";
 
-var template = "\n<div class=\"byline\">\n  <div class=\"authors\">\n  {{#authors}}\n    <div class=\"author\">\n      {{#personalURL}}\n        <a class=\"name\" href=\"{{personalURL}}\">{{name}}</a>\n      {{/personalURL}}\n      {{^personalURL}}\n        <div class=\"name\">{{name}}</div>\n      {{/personalURL}}\n      {{#affiliation}}\n        {{#affiliationURL}}\n          <a class=\"affiliation\" href=\"{{affiliationURL}}\">{{affiliation}}</a>\n        {{/affiliationURL}}\n        {{^affiliationURL}}\n          <div class=\"affiliation\">{{affiliation}}</div>\n        {{/affiliationURL}}\n      {{/affiliation}}\n    </div>\n    {{/authors}}\n  </div>\n  {{#publishedYear}}\n  <div class=\"date\">\n    <div class=\"month\">{{publishedMonth}}. {{publishedDay}}</div>\n    <div class=\"year\">{{publishedYear}}</div>\n  </div>\n  {{/publishedYear}}\n  {{#publishedYear}}\n  <a class=\"citation\" href=\"#citation\">\n    <div>Citation:</div>\n    <div>{{concatenatedAuthors}}, {{publishedYear}}</div>\n  </a>\n  {{/publishedYear}}\n</div>\n";
+var template = "\n<div class=\"byline\">\n" + 
+  "  <div class=\"authors\">\n" + 
+  "  {{#authors}}\n" + 
+  "    <div class=\"author\">\n" + 
+  "      {{#personalURL}}\n" + 
+  "        <a class=\"name\" href=\"{{personalURL}}\">{{name}}</a>\n" + 
+  "      {{/personalURL}}\n" + 
+  "      {{^personalURL}}\n" + 
+  "        <div class=\"name\">{{name}}</div>\n" + 
+  "      {{/personalURL}}\n" + 
+  "    </div>\n" + 
+  "    {{/authors}}\n" + 
+  "  </div>\n" + 
+  "  {{#publishedYear}}\n" + 
+  "  <div class=\"date\">\n" + 
+  "    <div class=\"month\">{{publishedMonth}}. {{publishedDay}}</div>\n" + 
+  "    <div class=\"year\">{{publishedYear}}</div>\n" + 
+  "  </div>\n" + 
+  "  {{/publishedYear}}\n" + 
+  "  {{#publishedYear}}\n" + 
+  "  {{/publishedYear}}\n" + 
+  "</div>\n";
 
 var byline = function(dom, data) {
   var el = dom.querySelector('dt-byline');
