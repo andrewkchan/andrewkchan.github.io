@@ -364,7 +364,21 @@
       </p>
       <p>
         We can simplify further and take advantage of the fact that \(\mathbf{x}_t\) can be written as a blending of \(\mathbf{x}_0\) with gaussian noise
-        \(\epsilon\). Plugging this in turns our mean prediction problem into a noise prediction problem:
+        \(\epsilon\). 
+      </p>
+      <p>
+        This means we can rewrite<dt-fn>Much thanks to <a href="https://calvinyluo.com/2022/08/26/diffusion-tutorial.html#three-equivalent-interpretations">Calvin Luo's blog</a> for providing detailed derivations. I learned while writing this post that I like seeing detailed proofs only a little more than I dislike math.</dt-fn>
+        $$
+        \mathbf{\mu}(\mathbf{x}_t, \mathbf{x}_0) = \frac{1}{\sqrt{\alpha_t}}\mathbf{x}_t - \frac{1-\alpha_t}{\sqrt{1-\bar\alpha_t}\sqrt{\alpha_t}}\epsilon
+        $$
+
+        And we can define \(\mu_\theta(\mathbf{x}_t)\) in terms of an estimator \(\epsilon_\theta\) to match:
+        $$
+        \mathbf{\mu}_\theta(\mathbf{x}_t) = \frac{1}{\sqrt{\alpha_t}}\mathbf{x}_t - \frac{1-\alpha_t}{\sqrt{1-\bar\alpha_t}\sqrt{\alpha_t}}\epsilon_\theta(\mathbf{x}_t, t)
+        $$
+      </p>
+      <p>
+        Plugging this in turns our mean prediction problem into a noise prediction problem:
         $$
         L = \sum_{t=1}^T\mathbb{E}_{\mathbf{x}_{0} \sim q,\epsilon}[\frac{(1-\alpha_t)^2}{2\Sigma(t)\alpha_t(1-\bar{\alpha}_t)}||\epsilon-\epsilon_\theta(\sqrt{\bar\alpha_t}\mathbf{x}_0 + \sqrt{1-\bar\alpha_t}\epsilon,t)||^2]
         $$
