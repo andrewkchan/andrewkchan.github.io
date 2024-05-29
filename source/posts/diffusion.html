@@ -632,6 +632,25 @@ def sample(model, img_size, alpha, alpha_bar):
         (<a href="https://www.youtube.com/watch?v=T0Qxzf0eaio">video</a>) provide a great overview of the tradeoffs of these and how stochasticity of samplers like DDPM can still 
         be important in some cases.
       </p>
+      <h3>Distillation</h3>
+      <img src="./diffusion-assets/distillation.png" alt="Progressive distillation" class="l-middle" style="width: min(90vw, 600px)" />
+      <p class="caption">
+        <i>
+            A visualization of two distillation steps from <dt-cite key="salimans2022progressive"></dt-cite> where a teacher mapping noise to samples \(\mathbf{x}\) in 4 deterministic 
+            steps is distilled into a model doing the same in a single step.
+        </i>
+      </p>
+      <p>
+        In progressive distillation, given a pre-trained <i>teacher</i> which can sample<dt-fn>Generally using a deterministic sampling 
+        algorithm.</dt-fn> in 1000 steps, we train a <i>student</i> to do the same thing in 500 steps by having the student predict the output of every 2 steps of the teacher. 
+        This can be repeated by making the student the new teacher, halving the steps each time.
+      </p>
+      <p>
+        Progressive distillation is lossy in practice, and too much can lead to blurry or unrealistic samples<dt-cite key="dieleman2024distillation"></dt-cite>.
+        This can be mitigated by adversarial distillation, in which a discriminator is jointly trained to ensure the student samples are realistic.
+        However, as seen in GANs, this trades off sample diversity<dt-fn>This begs the question: why use diffusion instead of GANs? One answer <dt-cite key="dieleman2024distillation"></dt-cite> is that diffusion plus distillation allows finer control over the tradeoff between speed and diversity.</dt-fn>. 
+        This method was used to train Stable Diffusion XL Turbo, which is capable of generating high-quality images in a single step<dt-cite key="sauer2023adversarial"></dt-cite>.
+      </p>
       <h2 id="section-3.2">3.2 Conditional generation</h2>
       <p>
         Given a model trained on animal images, how do I generate only cats?
@@ -1074,6 +1093,28 @@ def sample(model, img_size, alpha, alpha_bar):
             eprint={2303.04137},
             archivePrefix={arXiv},
             primaryClass={cs.RO}
+        }
+        @misc{salimans2022progressive,
+            title={Progressive Distillation for Fast Sampling of Diffusion Models}, 
+            author={Tim Salimans and Jonathan Ho},
+            year={2022},
+            eprint={2202.00512},
+            archivePrefix={arXiv},
+            primaryClass={cs.LG}
+        }
+        @misc{dieleman2024distillation,
+            author = {Dieleman, Sander},
+            title = {The paradox of diffusion distillation},
+            url = {https://sander.ai/2024/02/28/paradox.html},
+            year = {2024}
+        }
+        @misc{sauer2023adversarial,
+            title={Adversarial Diffusion Distillation}, 
+            author={Axel Sauer and Dominik Lorenz and Andreas Blattmann and Robin Rombach},
+            year={2023},
+            eprint={2311.17042},
+            archivePrefix={arXiv},
+            primaryClass={cs.CV}
         }
           
     </script>
