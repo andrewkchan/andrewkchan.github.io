@@ -818,6 +818,28 @@ def sample(model, img_size, alpha, alpha_bar):
       <p>
         An initial attack requires access to a model's feature extractor. The authors then examine how an attack based on 1 of 4 models performs on all the others, and say the results show their attack will generalize to models besides the initial model.
       </p>
+
+      <h2 id="section-3.4">3.4 Higher Resolution</h2>
+      <div class="l-middle">
+          <img src="./diffusion-assets/latent_space.png" alt="Latent space of an auto-encoder" style="display: inline-block; width: min(90vw, 350px)" />
+          <img src="./diffusion-assets/latent_diffusion.png" alt="Latent diffusion" style="display: inline-block; width: min(90vw, 350px)" />
+      </div>
+      <p class="caption">
+        <i>Images of latent diffusion from <a href="https://blog.marvik.ai/2023/11/28/an-introduction-to-diffusion-models-and-stable-diffusion/">blog post by Ignacio Aristimuño</a>.</i>
+      </p>
+      <p>
+        An early approach allowing higher resolution images was Cascaded Diffusion<dt-cite key="ho2021cascaded"></dt-cite>, which trained a diffusion model to do initial generation at a low resolution, then
+        a series of super-resolution diffusion models to upscale the image. 
+      </p>
+      <p>
+        Stable Diffusion uses an approach called latent diffusion, which generates images via diffusion in the latent space of an <a href="https://en.wikipedia.org/wiki/Autoencoder">auto-encoder</a>, then decodes the latent to get a high-resolution image<dt-cite key="rombach2022highresolution"></dt-cite>.
+        While there had been previous attempts at simultaneously training auto-encoders and diffusion models together, the latent diffusion authors found that simply training an auto-encoder to compress the image data first, then
+        separately training a diffusion model on the encoded latents worked best.
+      </p>
+      <p>
+        The above methods use a <b>backbone diffusion model</b> with multiple other models to scale up generated images. 
+        Progress in single-model resolution has involved various training tricks like multi-scale loss<dt-cite key="hoogeboom2023simple"></dt-cite> and the use of different backbone architectures like transformers<dt-cite key="crowson2024scalable"></dt-cite>.
+      </p>
       
       <dt-byline></dt-byline>
       <h1 id="section-4">4. Beyond images</h1>
@@ -1113,6 +1135,22 @@ def sample(model, img_size, alpha, alpha_bar):
             author={Axel Sauer and Dominik Lorenz and Andreas Blattmann and Robin Rombach},
             year={2023},
             eprint={2311.17042},
+            archivePrefix={arXiv},
+            primaryClass={cs.CV}
+        }
+        @misc{crowson2024scalable,
+            title={Scalable High-Resolution Pixel-Space Image Synthesis with Hourglass Diffusion Transformers}, 
+            author={Katherine Crowson and Stefan Andreas Baumann and Alex Birch and Tanishq Mathew Abraham and Daniel Z. Kaplan and Enrico Shippole},
+            year={2024},
+            eprint={2401.11605},
+            archivePrefix={arXiv},
+            primaryClass={cs.CV}
+        }
+        @misc{hoogeboom2023simple,
+            title={Simple diffusion: End-to-end diffusion for high resolution images}, 
+            author={Emiel Hoogeboom and Jonathan Heek and Tim Salimans},
+            year={2023},
+            eprint={2301.11093},
             archivePrefix={arXiv},
             primaryClass={cs.CV}
         }
