@@ -730,8 +730,59 @@ def sample(model, img_size, alpha, alpha_bar):
       <h3>Image conditioning</h3>
       <h4>Image-to-image</h4>
       <p>
-        Image-to-image doesn't require retraining a model. Instead, given an input image,
+        Basic image-to-image doesn't require retraining a model. Instead, given an input image,
         we can add noise to the image according to the desired strength of the conditioning image (less noise for stronger conditioning), then de-noise it.
+        This is called SDEdit and will result in the same overall shapes as the input image<dt-cite key="meng2022sdedit"></dt-cite>.
+        The drawback is that we cannot specify what exactly the input image is controlling; the method will make all features of the result look like
+        the input<dt-fn>At least as far as staying within the training data manifold allows. In practice, models like Stable Diffusion have a bias towards detailed paintings or photographs.</dt-fn> 
+        based on the strength. So for example if we put in a sketch, we have to choose between the result either looking like a sketch or not following the specified shape close enough.
+      </p>
+      <img src="./diffusion-assets/sdedit_sketch.png" alt="Attempting to use SDEdit on a sketch" class="l-middle" style="width: min(90vw, 450px)" />
+      <p class="caption">
+        <i>
+            Image via <dt-cite key="voynov2022sketch"></dt-cite>. SDEdit allows generating new images that look like the input, but does not allow fine-grained control as increasing
+            conditioning strength makes all features of the output look like the input. Here, the method struggles to add color and texture at high strength (low \(t\)).
+        </i>
+      </p>
+      <p>
+        How do we specify exactly what our input image will control? Training a conditional model \(\epsilon_\theta(\mathbf{x}_t, t, \mathbf{y})\) from scratch
+        with conditioning images \(\mathbf{y}\) in the desired modality works but is expensive.
+      </p>
+      <p>
+        A better idea is to use something like classifier guidance. Suppose we want to condition our generation with sketch images \(\mathbf{y}\). 
+        Given a noisy image \(\mathbf{x}_t\), we can train a model to predict the sketch lines \(\hat{\mathbf{y}}=\mathcal{F}(\mathbf{x}_t)\). 
+        We then guide each sampling step with the "sketch loss" gradient \(\nabla_{\mathbf{x}_t} ||\mathcal{F}(\mathbf{x}_t) - \mathbf{y}||^2\).
+        This is the idea behind Sketch-Guided Diffusion<dt-cite key="voynov2022sketch"></dt-cite>.
+      </p>
+      <p>
+        Another idea is to fine-tune our model: take our denoiser, make some architecture changes so it takes a conditioning image \(\mathbf{y}\), then re-train
+        it with the usual denoising objective on pairs \((\mathbf{x}_0, \mathbf{y})\). But naive fine-tuning can result in issues like overfitting and catastrophic forgetting.
+        Rather than risk the hard-won weights of our base model \(\epsilon_\theta\), we make a copy of them \(\epsilon_{\theta_2}\).
+      </p>
+      <img src="./diffusion-assets/controlnet.png" alt="ControlNet" class="l-middle" style="width: min(90vw, 450px)" />
+      <p class="caption">
+        <i>
+            Image of ControlNet via <dt-cite key="zhang2023adding"></dt-cite>. We fine-tune a model on pairs of output images and conditions \((\mathbf{x}_0, \mathbf{c})\) 
+            which has been augmented with a copy of the original model taking in \(\mathcal{C}(\mathbf{c}) + \mathbf{x}_t\). "Zero convolution" denotes a 1x1 convolution with
+            weights initialized to zero before training.
+        </i>
+      </p>
+      <p>
+        We'll call this the <b>control-net</b>, and it will take a combination of the conditioning image and noisy image \(\mathcal{C}_{\phi_1}(\mathbf{x}_t) + \mathbf{y}\), where 
+        \(\mathcal{C}_{\phi_1}(.)\) denotes a 1x1 convolution with learnable weights \(\phi_1\).
+        Then we will combine the output with our original denoiser: \(\epsilon_\theta(\mathbf{x}_t, t) + \mathcal{C}_{\phi_2}(\epsilon_{\theta_2}(\mathcal{C}_{\phi_1}(\mathbf{x}_t) + \mathbf{y}, t))\).
+        We'll freeze the original model but learn the parameters \(\theta_2, \phi_1, \phi_2\) via fine-tuning, with the convolutions \(\phi_1, \phi_2\)
+        initialized to zero at first so we gradually learn a delta to the denoising step.
+      </p>
+      <img src="./diffusion-assets/controlnet_examples.png" alt="ControlNet examples" class="l-middle" style="width: min(90vw, 600px)" />
+      <p class="caption">
+        <i>
+            ControlNet provides a general, efficient procedure to add conditional controls like Canny edges or human pose to a diffusion model via fine-tuning.
+        </i>
+      </p>
+      <p>
+        The ControlNet method in practice applies at a per-block level rather than on the level of the entire denoising model. Based on human evaluations, it performs better
+        than alternatives like Sketch-Guided Diffusion<dt-cite key="zhang2023adding"></dt-cite>.
       </p>
       <h4>Inpainting</h4>
       <p>
@@ -1151,6 +1202,28 @@ def sample(model, img_size, alpha, alpha_bar):
             author={Emiel Hoogeboom and Jonathan Heek and Tim Salimans},
             year={2023},
             eprint={2301.11093},
+            archivePrefix={arXiv},
+            primaryClass={cs.CV}
+        }
+        @misc{meng2022sdedit,
+            title={SDEdit: Guided Image Synthesis and Editing with Stochastic Differential Equations}, 
+            author={Chenlin Meng and Yutong He and Yang Song and Jiaming Song and Jiajun Wu and Jun-Yan Zhu and Stefano Ermon},
+            year={2022},
+            eprint={2108.01073},
+            archivePrefix={arXiv},
+            primaryClass={cs.CV}
+        }
+        @article{voynov2022sketch,
+            title={Sketch-Guided Text-to-Image Diffusion Models},
+            author={Voynov, Andrey and Aberman, Kfir and Cohen-Or, Daniel},
+            booktitle={arXiv preprint arXiv:2211.13752},
+            year={2022}
+        }
+        @misc{zhang2023adding,
+            title={Adding Conditional Control to Text-to-Image Diffusion Models}, 
+            author={Lvmin Zhang and Anyi Rao and Maneesh Agrawala},
+            year={2023},
+            eprint={2302.05543},
             archivePrefix={arXiv},
             primaryClass={cs.CV}
         }
