@@ -1,0 +1,218 @@
+<!DOCTYPE html><html><head>
+  <title>Perspective-Correct Interpolation</title>
+  <meta charset="utf-8">
+  <!-- Google tag (gtag.js) -->
+  <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
+  <!-- Sentry -->
+  <script src="https://js.sentry-cdn.com/f27e96506d16307fa97dcc9442b50117.min.js" crossorigin="anonymous"></script>
+  <script src="./template.v1.js"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-HYB0C59DXR');
+  </script>
+
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+      <script defer="" src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+  
+      <!-- Google tag (gtag.js) -->
+      <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
+      <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+  
+        gtag('config', 'G-HYB0C59DXR');
+      </script>
+  
+      <script type="text/front-matter">
+        title: "Perspective-Correct Interpolation"
+        published: June 3, 2024
+        authors:
+        - Andrew Chan: http://andrewkchan.github.io
+        affiliations:
+        -
+      </script>
+  
+      <style>
+        .caption > i {
+          font-size: 15px;
+          line-height: 1.3em;
+        }
+      </style>
+    </head>
+<body>
+  <dt-article>
+    <h1><a href="/" class="hero">Andrew Chan</a></h1>
+  </dt-article>
+  <hr>
+  <article class="toyb-article">
+    
+    
+    
+    <dt-article>
+      <h1>Perspective-Correct Interpolation</h1>
+      <h2>...and why the original PlayStation had textures that warped when the camera moved</h2>
+      <dt-byline></dt-byline>
+      <p>
+        When implementing my <a href="./diff-render.html">differentiable renderer</a>, I re-learned how rasterization works. In doing so I came across my favorite 
+        piece of code for the month: perspective-correct interpolation. Every modern rasterization pipeline implements this somewhere, but old rasterizers sometimes
+        didn't. In this post we'll go over how to do it<dt-fn>There are a few ways to derive this. Kok-Lim Low's proof <dt-cite key="low2002perspective"></dt-cite> is cited a lot on the internet. I liked the proof from 
+            <a href="https://github.com/ssloy/tinyrenderer/wiki/Technical-difficulties:-linear-interpolation-with-perspective-deformations">Dmitry Sokolov's tinyrenderer</a> best
+            and will go over that here.</dt-fn> and what happens when you don't have it.
+      </p>
+      <p>
+        When rasterizing a triangle, we need to first project the triangle's vertices onto the screen (image plane), then fill in all the pixels inside of the triangle with the right color.
+      </p>
+      <img src="./things-march-2024-assets/projection_similar_triangles.png" class="l-middle" alt="Projection of a scene point by similar triangles" style="width: min(90vw, 500px);">
+      <p>
+          The projection of a point is found by shooting a ray from the camera origin to the point, then finding where the ray intersects the image plane.
+          Figuring this out is pretty easy; if we assume that the image plane sits at \(z=1\) in front of the camera, then given a vertex \((x, y, z)\) in camera space,
+          it must project to the pixel corresponding to \((\frac{x}{z}, \frac{y}{z}, 1)\) in screen space<dt-fn>I am calling all points in 3D with \(z=1\) as screen space.</dt-fn> by similar triangles.
+      </p>
+      <p>
+        Filling in a pixel inside the triangle is trickier. Before we consider pixels, let's first consider points on the triangle in world space. We can express a point \(\mathbf{x}\) inside of a triangle
+        as a unique convex combination of the triangle's 3 vertices \(\mathbf{a}, \mathbf{b}, \mathbf{c}\) using <b>barycentric coordinates</b>: 3 numbers \(\lambda_A, \lambda_B, \lambda_C\) where \(\lambda_A + \lambda_B + \lambda_C = 1\) such that
+        $$
+        \mathbf{x} = \lambda_A \mathbf{a} + \lambda_B \mathbf{b} + \lambda_C \mathbf{c}
+        $$
+        If we know the barycentric coordinates for \(\mathbf{x}\), we can calculate what color \(\mathbf{I}\) it is by interpolating the colors of the triangle vertices with the barycentric coordinates:
+        $$
+        \mathbf{I} = \lambda_A \mathbf{I}_A + \lambda_B \mathbf{I}_B + \lambda_C \mathbf{I}_C
+        $$
+      </p>
+      <p>
+        We can use the matrix form of the above equation to compute the barycentric coordinates of an arbitrary world space \(\mathbf{x}\) that we know is inside of a triangle \(\mathbf{a}, \mathbf{b}, \mathbf{c}\):
+        $$
+        \mathbf{x} = \begin{bmatrix} \vert &amp; \vert &amp; \vert \\ \mathbf{a} &amp; \mathbf{b} &amp; \mathbf{c} \\ \vert &amp; \vert &amp; \vert \end{bmatrix} \begin{bmatrix} \lambda_A \\ \lambda_B \\ \lambda_C \end{bmatrix}
+        $$
+        $$
+        \begin{bmatrix} \lambda_A \\ \lambda_B \\ \lambda_C \end{bmatrix} = \begin{bmatrix} \vert &amp; \vert &amp; \vert \\ \mathbf{a} &amp; \mathbf{b} &amp; \mathbf{c} \\ \vert &amp; \vert &amp; \vert \end{bmatrix}^{-1} \mathbf{x}
+        $$
+      </p>
+      <p class="caption">
+        <i>
+            We can invert the matrix as long as the triangle is non-degenerate (e.g. it has nonzero area when projected).
+        </i>
+      </p>
+      <p>
+        Now let's return to screen space. Given an screen space point \(\mathbf{x}^\prime\) that we know is inside the projection \(\mathbf{a}^\prime, \mathbf{b}^\prime, \mathbf{c}^\prime\) of a triangle \(\mathbf{a}, \mathbf{b}, \mathbf{c}\), 
+        how do we compute what barycentric coordinates it corresponds to?
+      </p>
+      <p>
+        We can compute the barycentric coordinates \(\lambda_A^\prime, \lambda_B^\prime, \lambda_C^\prime\) of \(\mathbf{x}^\prime\) with respect to the projected triangle vertices: 
+        $$
+        \begin{bmatrix} \lambda_A^\prime \\ \lambda_B^\prime \\ \lambda_C^\prime \end{bmatrix} = \begin{bmatrix} \vert &amp; \vert &amp; \vert \\ \mathbf{a}^\prime &amp; \mathbf{b}^\prime &amp; \mathbf{c}^\prime \\ \vert &amp; \vert &amp; \vert \end{bmatrix}^{-1} \mathbf{x}^\prime
+        $$
+        
+        But we can't use this 
+        to interpolate the triangle colors because it wouldn't account for perspective: halfway between two projected triangle vertices is not the same as halfway between the two vertices in world space
+        when the triangle is not parallel to the image plane!
+      </p>
+      <img src="./things-march-2024-assets/perspective_interpolation.png" class="l-middle" alt="Perspective interpolation" style="width: min(90vw, 500px);">
+      <p class="caption">
+        <i>From <dt-cite key="low2002perspective"></dt-cite>: halfway \((c)\) between 2 projected vertices \(a, b\) is not the same as halfway \((C)\) between the vertices \(A, B\) in world space.</i>
+      </p>
+      <p>
+        Doing this naively is called <i>affine texture mapping</i>, and it's actually what <a href="https://retrocomputing.stackexchange.com/questions/5019/why-do-3d-models-on-the-playstation-1-wobble-so-much">very old game consoles like the PlayStation 1</a> did. 
+        It results in ugly texture warping: not only do textures look wrong on triangles viewed from an angle, but they will move around as the camera moves. As we'll see, doing perspective interpolation correctly requires performing extra divisions, 
+        which were expensive on older hardware, hence why it was skipped.
+      </p>
+      <iframe width="560" height="315" src="https://www.youtube.com/embed/x8TO-nrUtSI?si=AVO6G5TItcfSk_07&amp;start=402" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen="" class="l-middle"></iframe>
+      <p>
+        In fact, for larger triangles, textures will look obviously wrong. The only reason they don't on most PlayStation 1 games is because developers would break up long triangles into many smaller ones.
+        But this increased the polygon count and hurt the PS1's support for large open worlds like those seen in contemporary N64 games like Ocarina of Time or Super Mario 64.
+      </p>
+      <iframe width="560" height="315" src="https://www.youtube.com/embed/TuH7RDIDZN4?si=BUXUzZznFvI5-4Dl" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen="" class="l-middle"></iframe>
+      <p class="caption">
+        <i>Rendering Super Mario 64 with PS1-style affine interpolation yields surreal results on the low-poly levels.</i>
+      </p>
+      <img src="./things-march-2024-assets/perspective_correct.png" class="l-middle" alt="Perspective interpolation" style="width: min(90vw, 500px);">
+      <img src="./things-march-2024-assets/perspective_incorrect.png" class="l-middle" alt="Perspective interpolation" style="width: min(90vw, 500px);">
+      <p class="caption">
+        <i>From <a href="https://retrocomputing.stackexchange.com/questions/5019/why-do-3d-models-on-the-playstation-1-wobble-so-much">Retro Computing StackExchange</a>: viewing a slanted wall with perspective correct interpolation (top) vs affine (bottom).</i>
+      </p>
+      <p>
+        To obtain the perspective-correct points, we express the projected point \(\mathbf{x}^\prime\) in terms of the original camera-space point \(\mathbf{x}\):
+        $$
+        \mathbf{x} \frac{1}{\mathbf{x}_z} = \begin{bmatrix} \vert &amp; \vert &amp; \vert \\ \mathbf{a}^\prime &amp; \mathbf{b}^\prime &amp; \mathbf{c}^\prime \\ \vert &amp; \vert &amp; \vert \end{bmatrix} \begin{bmatrix} \lambda_A^\prime \\ \lambda_B^\prime \\ \lambda_C^\prime \end{bmatrix}
+        $$
+        $$
+        \begin{bmatrix} \vert &amp; \vert &amp; \vert \\ \mathbf{a} &amp; \mathbf{b} &amp; \mathbf{c} \\ \vert &amp; \vert &amp; \vert \end{bmatrix} \begin{bmatrix} \lambda_A \\ \lambda_B \\ \lambda_C \end{bmatrix} \frac{1}{\mathbf{x}_z} = \begin{bmatrix} \vert &amp; \vert &amp; \vert \\ \mathbf{a}^\prime &amp; \mathbf{b}^\prime &amp; \mathbf{c}^\prime \\ \vert &amp; \vert &amp; \vert \end{bmatrix} \begin{bmatrix} \lambda_A^\prime \\ \lambda_B^\prime \\ \lambda_C^\prime \end{bmatrix}
+        $$
+        
+        Since the projective transformation is equivalent to multiplying each triangle vertex by the reciprocal of its depth, we can factor the right-hand side so that it is applying the exact same transformation as the left-hand side:
+        $$
+        \begin{bmatrix} \vert &amp; \vert &amp; \vert \\ \mathbf{a} &amp; \mathbf{b} &amp; \mathbf{c} \\ \vert &amp; \vert &amp; \vert \end{bmatrix} \begin{bmatrix} \lambda_A \\ \lambda_B \\ \lambda_C \end{bmatrix} \frac{1}{\mathbf{x}_z} = \begin{bmatrix} \vert &amp; \vert &amp; \vert \\ \mathbf{a} &amp; \mathbf{b} &amp; \mathbf{c} \\ \vert &amp; \vert &amp; \vert \end{bmatrix} \begin{bmatrix} \frac{1}{\mathbf{a}_z} \lambda_A^\prime \\ \frac{1}{\mathbf{b}_z} \lambda_B^\prime \\ \frac{1}{\mathbf{c}_z} \lambda_C^\prime \end{bmatrix}
+        $$
+
+        We can invert and are left with an equation with 4 apparent unknowns - the three barycentric coordinates of and the z-component of the unknown original point \(\mathbf{x}\):
+        
+        $$
+        \begin{bmatrix} \lambda_A \\ \lambda_B \\ \lambda_C \end{bmatrix} \frac{1}{\mathbf{x}_z} = \begin{bmatrix} \frac{1}{\mathbf{a}_z} \lambda_A^\prime \\ \frac{1}{\mathbf{b}_z} \lambda_B^\prime \\ \frac{1}{\mathbf{c}_z} \lambda_C^\prime \end{bmatrix}
+        $$
+        
+        But actually, we know that barycentric coordinates must sum to one, and so we can solve for \(\frac{1}{\mathbf{x}_z}\) like so!
+
+        $$
+        1 = \mathbf{x}_z (\frac{1}{\mathbf{a}_z} \lambda_A^\prime + \frac{1}{\mathbf{b}_z} \lambda_B^\prime + \frac{1}{\mathbf{c}_z} \lambda_C^\prime)
+        $$
+        
+        So we arrive at the following formula for the barycentric coordinates of our original point:
+
+        $$
+        \begin{bmatrix} \lambda_A \\ \lambda_B \\ \lambda_C \end{bmatrix} = \begin{bmatrix} \frac{1}{\mathbf{a}_z} \lambda_A^\prime \\ \frac{1}{\mathbf{b}_z} \lambda_B^\prime \\ \frac{1}{\mathbf{c}_z} \lambda_C^\prime \end{bmatrix} \frac{1}{(\frac{1}{\mathbf{a}_z} \lambda_A^\prime + \frac{1}{\mathbf{b}_z} \lambda_B^\prime + \frac{1}{\mathbf{c}_z} \lambda_C^\prime)}
+        $$
+
+        This formula tells us we can first compute the barycentric coordinates of a projected point in screen-space, then get the real barycentric coordinates of the original, un-projected point by dividing each projected-point coordinate by the vertex depth and normalizing the result.
+      </p>
+      <p>
+        We can further express this only in terms of the triangle vertices and projected point:
+        $$
+        \begin{bmatrix} \lambda_A \\ \lambda_B \\ \lambda_C \end{bmatrix} = \gamma \ \begin{bmatrix} \frac{1}{\mathbf{a}_z} &amp; 0 &amp; 0 \\ 0 &amp; \frac{1}{\mathbf{b}_z} &amp; 0 \\ 0 &amp; 0 &amp; \frac{1}{\mathbf{c}_z} \end{bmatrix} \begin{bmatrix} \vert &amp; \vert &amp; \vert \\ \mathbf{a}^\prime &amp; \mathbf{b}^\prime &amp; \mathbf{c}^\prime \\ \vert &amp; \vert &amp; \vert \end{bmatrix}^{-1} \mathbf{x}^\prime
+        $$
+
+        This form is convenient for implementation. Here, \(\gamma\) is the scalar factor needed to ensure the final vector is normalized (elements sum to one).
+      </p>
+      <p>
+        In Python code, because my differentiable renderer is in Python:
+      </p>
+    <!-- <dt-code block language="python"> -->
+    <pre class="l-middle">        <code class="language-python">
+def compute_barycentric(vertices, screen_space_pt):
+    one_over_z = np.array([1/vertex[2] for vertex in vertices])
+    ss_vertices = vertices * one_over_z
+    ss_barycentric = np.matmul(np.linalg.inv(ss_vertices), screen_space_pt)
+    unnormalized_res = ss_barycentric * one_over_z
+    return unnormalized_res / sum(unnormalized_res)
+        </code>
+        </pre>
+    <!-- </dt-code> -->
+      <p>
+        In some software renderers, \(\gamma\) is leveraged to improve the computational efficiency by performing the matrix inversion without dividing by the matrix determinant, as this takes extra time to compute on its own but represents another scalar that can be absorbed into the normalizer \(\gamma\).
+      </p>
+    </dt-article>
+  
+    <dt-appendix>
+    </dt-appendix>
+  
+    <script type="text/bibliography">
+        @article{low2002perspective,
+            title={Perspective-correct interpolation},
+            author={Low, Kok-Lim},
+            journal={Technical writing, Department of Computer Science, University of North Carolina at Chapel Hill},
+            year={2002},
+            publisher={Citeseer}
+        }
+    </script>
+    <script defer="" src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement(document.body);
+      });
+    </script>
+  </article>
+
+</body></html>

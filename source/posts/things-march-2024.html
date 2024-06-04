@@ -1,0 +1,291 @@
+<toyb-post>
+    <toyb-title>Things I did in March 2024</toyb-title>
+    <toyb-date>June 4 2024</toyb-date>
+    <toyb-head>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+      <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+  
+      <!-- Google tag (gtag.js) -->
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
+      <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+  
+        gtag('config', 'G-HYB0C59DXR');
+      </script>
+
+      <link rel="stylesheet" href="dics.min.css">
+      <script src="dics.min.js"></script>
+  
+      <script type="text/front-matter">
+        title: "Things I did in March 2024"
+        published: June 4, 2024
+        authors:
+        - Andrew Chan: http://andrewkchan.github.io
+        affiliations:
+        -
+      </script>
+  
+      <style>
+        .caption > i {
+          font-size: 15px;
+          line-height: 1.3em;
+        }
+        .compact-li li {
+          margin-bottom: 0.5em;
+        }
+      </style>
+    </toyb-head>
+    <dt-article>
+      <h1>Things I did in March 2024</h1>
+      <dt-byline></dt-byline>
+      <p>
+        I want to start posting more of what I explore in the spirit of accountability and Andrew Healey's <a href="https://healeycodes.com/recent-projects-I-didnt-finish">Recent Projects I Didn't Finish</a>.
+        This post looks back on what I did in March, which was a month of a lot of reading and a little bit of building.
+      </p>
+      <h2>Differentiable Rendering</h2>
+      <p>
+        The first big topic that I explored was differentiable rendering. This is a relatively new technology which 
+        lets you obtain gradients of pixel values output by a renderer with respect to scene parameters. Two
+        recent breakthroughs in 3D reconstruction (<a href="https://en.wikipedia.org/wiki/Gaussian_splatting">gaussian splatting</a> and <a href="https://en.wikipedia.org/wiki/Neural_radiance_field">neural radiance fields</a>) 
+        are direct applications of differentiable rendering to different graphics primitives.
+      </p>
+      <img src="./diff-render-assets/rasterization.png" class="l-middle" alt="Traditional rasterization diagram" style="max-width: 90vw;">
+      <p class="caption">
+        <i>Diagram of rasterization from <a href="./diff-render.html">my differentiable rendering blog post</a>.</i>
+      </p>
+      <p>
+        Classic rasterization is not differentiable; pixels are samples of objects which can occlude each other or move a bit to 
+        no longer cover a pixel. But we can formulate rasterization to be differentiable if we make occlusion and coverage "softer".
+      </p>
+      <p>
+        See <a href="./diff-render.html"><i>Adventures with Differentiable Mesh Rendering</i></a> 
+        for more: with the right formulation, we can write a program which optimizes the rotation of a teapot to look like a given 2D image, or fit the vertices of a spherical mesh
+        to look like an image of a cow.
+      </p>
+      <p>
+        In retrospect, mesh rendering is not the most promising differentiable rendering technique. The gradients it provides are noisy, and mesh fitting
+        with it is too constrained, since you generally need to know the topology of the result ahead-of-time. But I had a lot of fun implementing
+        it and re-learning how rendering works from first principles (see also: <a href="./perspective-interpolation.html"><i>Perspective-Correct Interpolation</i></a>).
+      </p>
+      
+      <h2>Gaussian Splatting</h2>
+      <p>
+        In March I read about 3D gaussian splatting
+        via Aras-P's blog posts <a href="https://aras-p.info/blog/2023/09/05/Gaussian-Splatting-is-pretty-cool/">introducing the tech</a> and the <a href="https://aras-p.info/blog/2023/12/08/Gaussian-explosion/">explosion of activity in the ecosystem</a>. 
+      </p>
+      <div class="l-middle">
+        <img src="./things-march-2024-assets/3dgs_bicycle.png" alt="Gaussian splat representation of a bicycle with the splats rendered opaque" style="width: min(90vw, 400px);">
+        <img src="./things-march-2024-assets/3dgs_bicycle_opaque.png" alt="Gaussian splat representation of a bicycle with the splats" style="width: min(90vw, 400px);">
+      </div>
+      <p class="caption">
+        <i><b>Left:</b> Gaussian splat representation of a bicycle scene. <b>Right:</b> Same with the splats rendred opaque.</i>
+      </p>
+      <p>
+        Gaussian splatting is the most recent hotness in 3D reconstruction; by applying differentiable rendering to gaussian point clouds, we can reconstruct
+        a 3D representation of a scene given images of it with fidelity rivaling or surpassing the previous state-of-the-art in neural radiance fields and photogrammetry algorithms.
+        Gaussian splats are <i>fast</i>, too. It takes minutes to train a splat scene on a consumer GPU compared to hours for NeRFs. They're finding more applications in graphics and vision.
+      </p>
+      <p>
+        I also read a lot of Gaussian splat papers, mostly focused on reconstruction, meshing, and relighting. Some of these are already covered in <a href="https://aras-p.info/blog/2023/12/08/Gaussian-explosion/">Aras-P's post</a>,
+        but the validating peer reviews/results have come out. Others are new. Below are ones that I found especially interesting.
+      </p>
+      <h3>Reconstruction</h3>
+      <img src="./things-march-2024-assets/gaussianobject.png" class="l-middle" alt="GaussianObject" style="width: min(90vw, 450px);">
+      <p class="caption">
+        <i>GaussianObject aids reconstruction of a single object by "fixing up" views of the object that don't quite look right with a diffusion model, then training the splats on the fixed views.</i>
+      <p>
+        Reconstruction is the original application for splats. Since then there have been a few advances in increasing accuracy and reducing the number of input images needed.
+        A promising direction is the use of image generation models like Stable Diffusion to synthesize views of the scene from more angles (see <a href="https://gaussianobject.github.io/">GaussianObject</a>, <a href="https://qjfeng.net/FDGaussian/">FDGaussian</a>).
+      </p>
+      <h3>Meshing</h3>
+      <img src="./things-march-2024-assets/sugar.png" class="l-middle" alt="SuGaR" style="width: min(90vw, 450px);">
+      <p>
+        Triangle meshes are still king when it comes to making production 3D applications at scale, so it's important to be able to convert splat scenes to high-quality meshes.
+        A paper that made a splash here recently was <a href="https://anttwo.github.io/sugar/">SuGaR: Surface-Aligned Gaussian Splatting</a> (CVPR 2024), which first applies 
+        regularization during splat training to encourage the formation of smooth surfaces, then extracts meshes by running a Poisson reconstruction algorithm on the splats.
+        An interesting idea here is an optional final step which instantiates splats on top of the mesh, then optimizes that hybrid representation for best results.
+      </p>
+      <h3>Relighting</h3>
+      <p>
+        Vanilla gaussian splats have their colors baked-in and cannot be relit realistically.
+        Research into relighting them has to not only recover the lighting conditions of the scene, but also the material properties of the objects in it.
+        And since lighting is also strongly influenced by surface geometry, relighting also requires that gaussians form coherent surfaces (and especially normals).
+      </p>
+      <p>
+        <a href="https://nju-3dv.github.io/projects/Relightable3DGaussian/">Relightable 3D Gaussian (Nov 2023)</a> attempts both of these things, recovering explicit normals and improved
+        implicit geometry, and estimating both scene lighting as well as materials of the gaussians (parameterized by the <a href="https://disneyanimation.com/publications/physically-based-shading-at-disney/">Disney BRDF model</a>).
+        I examine their results a bit more closely in my April blog post: <a href="./lit-splat.html"><i>Real-Time Lighting with Gaussian Splats</i></a>.
+      </p>
+      <video class="l-middle" controls width="240" src="./things-march-2024-assets/rgca.mp4" style="width: min(90vw, 600px)"></video>
+      <p>
+        Another paper which I didn't get the chance to dive into but which is equally cited and got an oral spot at CVPR 2024 is <a href="https://shunsukesaito.github.io/rgca/">Relightable Gaussian Codec Avatars</a>.
+        This work focuses on building high-fidelity relightable head avatars that can be animated; the geometry of the head avatars is totally comprised of 3D gaussians, each gaussian has
+        some lighting parameters associated, and all parameters are jointly optimized during 3D gaussian training on multiview video data of a person illuminated with known point light patterns.
+      </p>
+      <h3>Other</h3>
+      <p>
+        <a href="https://oppo-us-research.github.io/SpacetimeGaussians-website/">Spacetime Gaussian Feature Splatting</a> (Dec 2023) reconstructs <i>4D scenes</i> (e.g. videos where you can pan/move the camera) using Gaussians. You can check out some examples using 
+        <a href="http://antimatter15.com/splaTV/">Kevin Kwok's online viewer</a>.
+      </p>
+      <img src="./things-march-2024-assets/dreamgaussian.png" class="l-middle" alt="SuGaR" style="width: min(90vw, 600px);">
+      <p>
+        <a href="https://dreamgaussian.github.io/">DreamGaussian (September 2023)</a> landed a ICLR 2024 oral spot. It leverages the text-to-2D prior of image diffusion models to generate 3D models
+        given a text prompt. It's a bit more complicated because it uses a method called "score distillation sampling", but basically it generates random views of a given text prompt, then trains
+        a gaussian splat model on those views.
+      </p>
+      <p>
+        Finally, <a href="https://spla-tam.github.io/">SplaTAM</a> (Dec 2023, CVPR 2024) is a very cool application of Gaussian splats to robotics. Gaussian splats provide a volumetric way
+        to reconstruct the world around a robot from a single optical camera, with experiments showing up to 2x performance in various <a href="https://en.wikipedia.org/wiki/Simultaneous_localization_and_mapping">SLAM</a> tasks over existing methods.
+      </p>
+
+      <h2>Neural graphics primitives</h2>
+      <p>
+        Neural graphics primitives are another hot topic in computer graphics and vision. Broadly speaking, images are samples of some underlying visual signal (this could be a radiance field, geometric surface, 
+        or even just image colors), and we can train a neural network on these samples to represent this underlying signal, which we can then use to do novel view synthesis, 3D reconstruction, and many of the 
+        same tasks that we can use gaussian splats for<dt-fn>The interest in neural graphics primitives precedes gaussian splatting for a few years and started around 2020.</dt-fn>. For instance, given a 2D image,
+        we can train a neural network to represent it as a function from pixel position to color: \(\mathbb{R}^2 \mapsto \mathbb{R}^3\).
+      </p>
+      <div class="b-dics l-middle" style="width: 600px; max-width: 70vw;">
+        <img src="./things-march-2024-assets/numbat_original.png" alt="Original">
+        <img src="./things-march-2024-assets/numbat_sinusoid.png" alt="Compressed">
+      </div>
+      <p class="caption">
+        <i>An image compressed to 76kb with a neural network<dt-fn>Still not as good as an equivalent JPEG encoding yet!</dt-fn> vs. the original 497kb PNG.</i>
+      </p>
+      <p>
+        <a href="https://thenumb.at/Neural-Graphics/">Max Slater's blog post</a> is the best introduction I've seen to this topic. It starts off with the use case of <i>image compression</i> -
+        if we're able to learn a neural representation of an image whose parameters take up less space than the image pixels, we've compressed the image. It also goes into further applications
+        like learning 3D surfaces with neural SDFs, doing 3D reconstruction with neural radiance fields, and using neural radiance caching to accelerate real-time ray-tracing.
+      </p>
+      <img src="./things-march-2024-assets/neuralangelo.jpeg" class="l-middle" alt="NeuralAngelo" style="width: min(90vw, 500px);">
+      <p class="caption">
+        <i>Left-to-right: RGB capture of David, NeuralAngelo's normal map, and the output 3D mesh.</i>
+      </p>
+      <p>
+        Like gaussian splats, neural graphics primitives can also be meshed and relit. In fact, neural graphics primitives were the first to achieve the fidelity we're seeing with splats, and the tech is
+        a bit more mature. 
+        <ul>
+          <li>
+            <a href="https://research.nvidia.com/labs/dir/neuralangelo/">NeuralAngelo</a> (CVPR 2023), one of TIME's "Best Inventions of 2023", models the underlying surface of a set of images
+            as a signed distance function and uses several tricks like a multi-resolution hash encoding of input points and coarse-to-fine optimization to make the learning objective as easy as possible.
+          </li>
+          <li>
+            The SDF representation can be converted to a mesh using <a href="https://en.wikipedia.org/wiki/Marching_cubes">marching cubes</a> or similar algorithms.
+          </li>
+          <li>
+            <a href="https://github.com/hugoycj/Instant-angelo">Instant-angelo</a> is an implementation claiming high-fidelity results with 20 minutes of training on real-world RGB videos on a single consumer GPU.
+          </li>
+        </ul>
+      </p>
+
+      <h2>Computer graphics</h2>
+      <p>
+        March was also a month for me to re-learn computer graphics (and learn lots of stuff I didn't know before, like most of real-time rendering).
+        A meta-resource I really liked was my former coworker Mike Turitzin's blog post on <a href="https://miketuritzin.com/post/how-to-learn-computer-graphics-techniques-and-programming/">how to learn graphics</a>.
+        Some major takeaways for me:
+        <ul class="compact-li">
+          <li>Computer graphics is a huge field with enough depth and active research that learning it can seem overwhelming.</li>
+          <li>
+            <p>
+              Some learning approaches which can help a lot:
+            </p>
+            <ul>
+              <li>Work on a project that you are very interested in, because interest will drive you to spend more time on it and learn more.</li>
+              <li>Be ok with feeling dumb, including taking multiple passes over the same material to fully understand it, and reading multiple explanations of the same concepts.</li>
+              <li>
+                <p>
+                  It's not necessary to fully understand a topic, and can be better to only understand at some abstraction level - approach learning graphics topics as “peeling off layers of an onion”.
+                </p>
+                <ul>
+                  <li>Sometimes it's ok to implement things that you don't fully understand yet (e.g. coding up math formulas that still seem cryptic) - going into some “debt” is necessary to keep things moving.</li>
+                  <li>Make a list of things you implemented that you don't fully understand, and aim to learn more about them as you continue moving forward.</li>
+                  <li>Embrace building off the work of others - otherwise, you'll waste a lot of time coming up with sub-par solutions.</li>
+                </ul>
+              </li>
+            </ul>
+          </li>
+          <li>
+            <p>
+              What learning will concretely look like:
+            </p>
+            <ul>
+              <li>Reading lots of articles, blog posts, course notes, conference papers, forum posts, twitter threads, powerpoint slides, PhD theses, books, and videos of talks</li>
+              <li>It's normal to sometimes waste lots of time trying to decipher a resource, but figure out later the author wasn't explaining well - eventually you'll develop a sense for when a resource sucks.</li>
+              <li>
+                This scenario is very common:
+                <ul>
+                  <li>You have a new graphics problem to solve for a project.</li>
+                  <li>
+                    You need to learn the landscape of the problem to determine how to proceed. What are the SOTA solutions? What are the tradeoffs between quality, efficiency, and ease of implementation?
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </li>
+        </ul>
+      </p>
+      <p>
+        My favorite resource this month was <a href="https://learnopengl.com/">learnopengl.com</a> (the shadow and PBR tutorials are great).
+      </p>
+      <p>
+        I also really enjoyed watching these long graphics talks. The first is a 53 minute 2019 talk by Alexander Sannikov (who has his own Youtube Channel) on the techniques used in <i>Path of Exile</i>, with a special emphasis on
+        the real-time global illumination approach:
+      </p>
+      <iframe width="560" height="315" src="https://www.youtube.com/embed/whyJzrVEgVc?si=zY-FdZucc9HGznE_" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen class="l-middle"></iframe>
+      <p>
+        And the classic 30 minute "Learning from Failure" talk by Alex Evans on all the different experimental renderers (using different primitives like SDFs, voxels, splats) that Media Molecule tried
+        for Dreams (PS4). Still lots in both of these videos that I don't understand yet!
+      </p>
+      <iframe width="560" height="315" src="https://www.youtube.com/embed/u9KNtnCZDMI?si=0chWpEXphEGaHHFc" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen class="l-middle"></iframe>      
+
+      <h2>Other</h2>
+      <p>
+        Some non-technical reads I liked in March include:
+        <ul>
+          <li>
+            <a href="https://www.noahpinion.blog/p/its-not-cancel-culture-its-cancel-ade">It's not Cancel Culture, it's Cancel Technology</a> blog post by Noah Smith: 
+            In a nutshell, social ostracization has always been a thing, but the internet vastly changed the distribution (you could interact with many more strangers than ever before, which made it harder 
+            to "read the room" and opened you up to more attack) and memory (everything you say/do online is recorded, making it harder to reinvent yourself) of social interactions, hence cancel culture
+            is less a cultural phenomenon and more a technological one.
+          </li>
+          <li>
+            <a href="https://www.amazon.com/Snakehead-Chinatown-Underworld-American-Dream/dp/0307279278">The Snakehead</a> by Patrick Keefe:
+            A nonfiction book written like a thriller about the wild world of illegal immigration from China to the US and the extensive organized networks of "snakeheads" (often based out of Chinatowns)
+            that supported it. The book focuses on the twentieth century (through the spike in illegal immigration after the Tiananmen protests); it seems relevant again with the <a href="https://www.wsj.com/story/fleeing-china-many-take-dangerous-route-to-us-27dde3c5">surge in Chinese illegal immigration</a>
+            since the pandemic.
+          </li>
+          <li>
+            <a href="https://www.amazon.com/Im-Glad-My-Mom-Died/dp/1982185821">I'm Glad My Mom Died</a> by Jennette McCurdy: A memoir by the actress for Sam from iCarly about growing up with intense pressure to 
+            become a star actress, an abusive private life that didn't reflect her external success at all, and the struggles of carving out a career of her own as an adult in the shadow of iCarly. Childhood stardom really ruins lives! 
+          </li>
+        </ul>
+      </p>
+    </dt-article>
+  
+    <dt-appendix>
+    </dt-appendix>
+  
+    <script type="text/bibliography">
+        @article{low2002perspective,
+            title={Perspective-correct interpolation},
+            author={Low, Kok-Lim},
+            journal={Technical writing, Department of Computer Science, University of North Carolina at Chapel Hill},
+            year={2002},
+            publisher={Citeseer}
+        }
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement(document.body);
+      });
+
+      document.querySelectorAll('.b-dics').forEach((el) => {
+          new Dics({
+            container: el,
+          });
+      })
+    </script>
+  </toyb-post>
