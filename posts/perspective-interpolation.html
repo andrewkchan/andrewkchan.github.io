@@ -166,8 +166,8 @@ def rasterize_triangle(vertices, vertex_colors, out_pixels):
       </p>
       <p>
         Doing this naively is called <i>affine texture mapping</i>, and it's actually what <a href="https://retrocomputing.stackexchange.com/questions/5019/why-do-3d-models-on-the-playstation-1-wobble-so-much">very old game consoles like the PlayStation 1</a> did. 
-        It results in ugly texture warping: not only do textures look wrong on triangles viewed from an angle, but they will move around as the camera moves. As we'll see, doing perspective interpolation correctly requires performing extra divisions, 
-        which were expensive on older hardware, hence why it was skipped.
+        It results in ugly texture warping: not only do textures look wrong on triangles viewed from an angle, but they will move around as the camera moves. As we'll see, doing perspective interpolation correctly requires performing an extra
+        division by the depth of a pixel. This was not only expensive but not possible using hardware acceleration on PS1, which <a href="https://www.david-colson.com/2021/11/30/ps1-style-renderer.html">lacked a depth buffer</a>.
       </p>
       <iframe width="560" height="315" src="https://www.youtube.com/embed/x8TO-nrUtSI?si=AVO6G5TItcfSk_07&amp;start=402" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen="" class="l-middle"></iframe>
       <p>
