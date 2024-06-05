@@ -63,7 +63,7 @@
         $$
       </p>
       <p>
-        We can use the matrix form of the above equation to compute the barycentric coordinates of an arbitrary world space \(\mathbf{x}\) that we know is inside of a triangle \(\mathbf{a}, \mathbf{b}, \mathbf{c}\):
+        We can use the matrix form of the above equation to compute the barycentric coordinates of an arbitrary world space \(\mathbf{x}\) with respect to a triangle \(\mathbf{a}, \mathbf{b}, \mathbf{c}\):
         $$
         \mathbf{x} = \begin{bmatrix} \vert & \vert & \vert \\ \mathbf{a} & \mathbf{b} & \mathbf{c} \\ \vert & \vert & \vert \end{bmatrix} \begin{bmatrix} \lambda_A \\ \lambda_B \\ \lambda_C \end{bmatrix}
         $$
@@ -73,22 +73,72 @@
       </p>
       <p class="caption">
         <i>
-            We can invert the matrix as long as the triangle is non-degenerate (e.g. it has nonzero area when projected).
+            We can invert the matrix as long as the triangle is non-degenerate (e.g. it has nonzero area when projected). Also, another nice property of barycentrics is that \(\mathbf{x}\) is inside the triangle
+            if and only if \(0 \leq \lambda_A, \lambda_B, \lambda_C \leq 1\), since a triangle is the <a href="https://en.wikipedia.org/wiki/Convex_combination">convex set</a> of its points.
         </i>
       </p>
       <p>
+        In Python code (because my differentiable renderer is in Python), rasterizing a single triangle might look something like:
+      </p>
+    <!-- <dt-code block language="python"> -->
+        <pre class="l-middle">
+            <code class="language-python">
+def is_inside(screen_space_pt, ss_vertices_T_inv):
+    """
+    screen_space_pt - Array of length 3 representing a point in screen space
+    ss_vertices_T_inv - 3x3 matrix of floats giving the inverse of the matrix 
+                      whose columns are the screen-space coordinates of the 
+                      triangle vertices
+    Input may also be in pixel space, which is the same as screen space 
+    up to a multiplicative factor
+    """
+    ss_barycentric = np.matmul(ss_vertices_T_inv, screen_space_pt)
+    return np.all(ss_barycentric >= 0)
+
+def rasterize_triangle(vertices, vertex_colors, out_pixels):
+    """
+    vertices - 3x3 array of floats where vertices[i] gives camera-space 
+               coordinates of the ith triangle vertex
+    vertex_colors - 3x3 array of floats where vertex_colors[i] gives the 
+               RGB colors of the ith triangle vertex
+    """
+    one_over_z = np.array([1/vertex[2] for vertex in vertices])
+    ss_vertices = vertices * one_over_z
+    px_vertices_T = (out_pixels.shape[:2] * ss_vertices[:, :2]).T
+    px_vertices_T_inv = np.linalg.inv(
+        np.concatenate((px_vertices_T, np.array([[1, 1, 1]])), axis=0))
+    xmin, xmax, ymin, ymax = compute_bbox(px_vertices_T)
+    for y in range(ymin, ymax):
+        if y<0 or y>=out_pixels.shape[1]:
+            continue
+        for x in range(xmin, xmax):
+            if x<0 or x>=out_pixels.shape[0]:
+                continue
+            px_pt = np.array([x + 0.5, y + 0.5, 1])
+            if is_inside(px_pt, px_vertices_T_inv):
+                barycentric = compute_barycentric(""" TODO """)
+                out_pixels[x, y] = barycentric.dot(vertex_colors)
+            </code>
+        </pre>
+    <!-- </dt-code> -->
+      <p>
         Now let's return to screen space. Given an screen space point \(\mathbf{x}^\prime\) that we know is inside the projection \(\mathbf{a}^\prime, \mathbf{b}^\prime, \mathbf{c}^\prime\) of a triangle \(\mathbf{a}, \mathbf{b}, \mathbf{c}\), 
-        how do we compute what barycentric coordinates it corresponds to?
+        how do we compute what barycentric coordinates it corresponds to? In other words, how do we implement <code>compute_barycentric</code> in the code above?
       </p>
       <p>
         We can compute the barycentric coordinates \(\lambda_A^\prime, \lambda_B^\prime, \lambda_C^\prime\) of \(\mathbf{x}^\prime\) with respect to the projected triangle vertices: 
         $$
         \begin{bmatrix} \lambda_A^\prime \\ \lambda_B^\prime \\ \lambda_C^\prime \end{bmatrix} = \begin{bmatrix} \vert & \vert & \vert \\ \mathbf{a}^\prime & \mathbf{b}^\prime & \mathbf{c}^\prime \\ \vert & \vert & \vert \end{bmatrix}^{-1} \mathbf{x}^\prime
         $$
-        
-        But we can't use this 
-        to interpolate the triangle colors because it wouldn't account for perspective: halfway between two projected triangle vertices is not the same as halfway between the two vertices in world space
-        when the triangle is not parallel to the image plane!
+
+        We're already using these coordinates to check whether a screen-space point is inside the triangle above in <code>is_inside</code>, and it works because a projected point is inside the projected triangle 
+        only if its ray also intersects the camera-space triangle.
+      </p>
+      <p>
+          But we can't use this 
+          to interpolate the triangle colors because it wouldn't account for perspective: halfway between two projected triangle vertices is not the same as halfway between the two vertices in world space
+          when the triangle is not parallel to the image plane!
+
       </p>
       <img src="./things-march-2024-assets/perspective_interpolation.png" class="l-middle" alt="Perspective interpolation" style="width: min(90vw, 500px);">
       <p class="caption">
@@ -156,15 +206,19 @@
         This form is convenient for implementation. Here, \(\gamma\) is the scalar factor needed to ensure the final vector is normalized (elements sum to one).
       </p>
       <p>
-        In Python code, because my differentiable renderer is in Python:
+        In Python code:
       </p>
     <!-- <dt-code block language="python"> -->
     <pre class="l-middle">
         <code class="language-python">
-def compute_barycentric(vertices, screen_space_pt):
-    one_over_z = np.array([1/vertex[2] for vertex in vertices])
-    ss_vertices = vertices * one_over_z
-    ss_barycentric = np.matmul(np.linalg.inv(ss_vertices), screen_space_pt)
+def compute_barycentric(one_over_z, ss_barycentric):
+    """
+    ss_barycentric - Array of length 3 representing the barycentric coordinates 
+                     of a screen-space point with respect to the screen-space
+                     triangle vertices
+    one_over_z - Array of length 3 representing the reciprocal of the z-coordinate
+                 of the camera-space triangle vertices
+    """
     unnormalized_res = ss_barycentric * one_over_z
     return unnormalized_res / sum(unnormalized_res)
         </code>
