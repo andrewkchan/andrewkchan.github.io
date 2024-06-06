@@ -1,0 +1,357 @@
+<!DOCTYPE html><html><head>
+  <title>Things I did in April 2024</title>
+  <meta charset="utf-8">
+  <!-- Google tag (gtag.js) -->
+  <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
+  <!-- Sentry -->
+  <script src="https://js.sentry-cdn.com/f27e96506d16307fa97dcc9442b50117.min.js" crossorigin="anonymous"></script>
+  <script src="./template.v1.js"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-HYB0C59DXR');
+  </script>
+
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+      <script defer="" src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+  
+      <!-- Google tag (gtag.js) -->
+      <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
+      <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+  
+        gtag('config', 'G-HYB0C59DXR');
+      </script>
+
+      <link rel="stylesheet" href="dics.min.css">
+      <script src="dics.min.js"></script>
+  
+      <script type="text/front-matter">
+        title: "Things I did in April 2024"
+        published: June 5, 2024
+        authors:
+        - Andrew Chan: http://andrewkchan.github.io
+        affiliations:
+        -
+      </script>
+  
+      <style>
+        .caption > i {
+          font-size: 15px;
+          line-height: 1.3em;
+        }
+        .compact-li li {
+          margin-bottom: 0.5em;
+        }
+      </style>
+    </head>
+<body>
+  <dt-article>
+    <h1><a href="/" class="hero">Andrew Chan</a></h1>
+  </dt-article>
+  <hr>
+  <article class="toyb-article">
+    
+    
+    
+    <dt-article>
+      <h1>Things I did in April 2024</h1>
+      <h2>More gaussian splatting, Metal vs. CUDA, and earthquake worms.</h2>
+      <dt-byline></dt-byline>
+      <p>
+        I was able to build some stuff in April, which was fun, but like March, spent lots of time learning stuff in new domains!
+      </p>
+      
+      <h2>Lighting with Gaussian Splats</h2>
+      <p>
+        The first thing I built was an implementation of something I saw on Twitter - a real-time lighting model for Gaussian splats.
+        Looking back, it's pretty straightforward to get some lighting working if you know about traditional lighting techniques. For instance, all you need for shadow mapping is a way to view the depth of a scene from
+        different viewpoints. And shading can also be done with a depth image as it's not too difficult to extract surface normals. So this post was partly just me learning traditional lighting
+        techniques.
+      </p>
+      <img src="./things-april-2024-assets/splat_shadows.png" class="l-middle" alt="Gaussian splats with shadows" style="width: min(90vw, 600px);">
+      <p class="caption">
+        <i>A splat scene with shadow mapping applied. Spooky!</i>
+      </p>
+      <p>
+        That said, just bolting on these techniques isn't really enough as current splatting outputs are not designed to form coherent surface geometry. As I show in the post, we can somewhat fix this by filtering depth,
+        but really we need to alter the reconstruction process so that proper geometry is encouraged.
+      </p>
+      <p>
+        One frustrating thing was that when exploring various papers as part of this project, I usually spent more time trying to get their code running than reading the actual paper or evaluating its results. 
+        For example, with the Relightable Gaussians paper, I spent more than an entire day trying to get the Python environment working with my machine. 
+      </p>
+      <p>
+        Part of this is my own inexperience: for example, I didn't realize that while PyTorch normally comes with its own CUDA runtime which doesn't need to match the system CUDA, when <a href="https://github.com/pytorch/pytorch/issues/55267">installing 
+        C++ extensions for a specific PyTorch installation</a>, it <i>does</i> need to match the system CUDA! I also didn't know that Anaconda provides a virtual environment for all types of 
+        dependencies, not just Python libraries. So you can have different CUDA versions in different Anaconda environments. 
+      </p>
+
+      <h2>Adding Apple Silicon Support to Gaussian Splatting</h2>
+      <img src="./things-april-2024-assets/opensplat_banana.gif" class="l-middle" alt="Gaussian splats with shadows" style="width: min(90vw, 450px);">
+      <p class="caption">
+        <i>Banana courtesy of <a href="https://github.com/pierotofy/OpenSplat">OpenSplat</a>.</i>
+      </p>
+      <p>
+        I also <a href="https://x.com/andrew_k_chan/status/1779701244682289612">added the first Apple GPU support to any open-source Gaussian splatting program</a><dt-fn>That I know of! There is Scaniverse, which is very impressive and supports training splats on iPhone, but it's proprietary.</dt-fn>. 
+        Apple GPU support in the machine learning<dt-fn>Yeah, I know gaussian splats are not really machine learning. But they use all the same tooling.</dt-fn> world generally feels pretty weird. On the one hand basically everyone I know in my tech bubble uses a Mac, so it seems like allowing training of small models locally would be
+        useful, but on the other hand anybody serious will just rent or buy a desktop with an NVIDIA GPU. Maybe there is only substantial demand for supporting <i>inference</i> on Apple GPUs?
+      </p>
+      <p>
+        In any case I learned a lot about Metal, CUDA, and parallel programming in this project, which involved translating over the fused CUDA kernels used for Gaussian splatting to Metal. Some of my thoughts:
+      </p>
+      <h3>Thoughts on Metal (vs. CUDA)</h3>
+      <h4>The device API and shader language</h4>
+      <p>
+        Metal shader language has all the features that were used in the gaussian splatting CUDA kernels, and overall seems fairly well-featured.
+        For example, the various units of execution in the CUDA GPU model are also there in Metal, just with different names:
+        </p><ul>
+          <li>
+            MPS grids = CUDA grids
+          </li>
+          <li>
+            MPS thread groups = CUDA thread blocks
+          </li>
+          <li>
+            MPS threads = CUDA threads
+          </li>
+        </ul>
+      <p></p>
+      <p>
+        There are also atomics and warp-level primitives like shuffle instructions, so for the most part I was able to translate CUDA kernels to MPS kernels, parallel reductions and all, by just
+        copy-pasting and looking up the right name for the primitives to use.
+      </p>
+      <p>
+        There are some annoying differences though. One thing that stumped me for a whole afternoon was that Metal expects a particular alignment of vectorized data types. Specifically Metal assumed
+        <code>float3</code> arrays were using 16-byte <code>float3</code> alignment when my program was dispatching the kernels with packed (12-byte) <code>float3</code> alignment due to the data coming from packed PyTorch tensors. 
+        I had to rewrite all the kernels to use "raw" <code>float</code> arrays instead with helper functions to extract <code>float3</code> values.
+      </p>
+      <p>
+        Finally, while MSL and CUDA both look a lot like C++, CUDA is a lot closer to being a superset of C++. 
+        </p><ul>
+          <li>
+            For example, you can include other C++ code in CUDA shaders. So for instance, you can use <a href="https://github.com/g-truc/glm">glm</a> to make working with matrices easier (although MSL has nice native functionality for matrix-vector ops in particular, as it has graphics roots).
+          </li>
+          <li>
+            Also, in CUDA there is in-kernel <code>printf</code> which goes to a host-side output stream. For someone coming from the comparatively ancient world of WebGL and OpenGL ES 3.0, this is an absurd luxury. Metal doesn't have anything similar.
+          </li>
+        </ul>
+      <p></p>
+      <h4>The host API</h4>
+      <p>
+        Metal is lower-level and more verbose than CUDA. Whereas a kernel dispatch in CUDA is as easy as writing a funny-looking function call, in Metal, you need to manually encode which kernel you're dispatching, what 
+        arguments you're passing to it, and more. Apparently, this is common for graphics programming APIs: WebGPU works the same way as Metal.
+      </p>
+      <p>
+        In CUDA, defining and dispatching a kernel to add all elements of a float array allocated on the device might look like so:
+      </p>
+      <!-- <dt-code block language="clike"> -->
+        <pre class="l-middle">          <code class="language-clike">
+// host code
+void add_constant(float x, float* data, const int n) {
+  int blocks = (n + N_THREADS - 1) / N_THREADS;
+  add_constant_kernel&lt;&lt;&lt;blocks, N_THREADS&gt;&gt;&gt;(n, x, data);
+}
+
+// device code
+__global__ void add_constant_kernel(const int n, const float x, float* data) {
+  unsigned idx = cg::this_grid().thread_rank();
+  if (idx &gt;= n) return;
+  data[idx] += x;
+}
+          </code>
+      </pre>
+      <!-- </dt-code> -->
+      <p>
+        In Metal it looks like this:
+      </p>
+      <!-- <dt-code block language="clike"> -->
+        <pre class="l-middle">          <code class="language-clike">
+// host code
+void add_constant(MetalContext* ctx, float x, float* data, const int n) {
+  id&lt;MTLCommandBuffer&gt; command_buffer = [ctx-&gt;command_queue commandBuffer];
+  id&lt;MTLComputeCommandEncoder&gt; encoder = [command_buffer computeCommandEncoder];
+  
+  // add_constant_cpso is a MTLComputePipelineState object created beforehand
+  [encoder setComputePipelineState:ctx-&gt;add_constant_cpso];
+  [encoder setBytes:&amp;n length:sizeof(n) atIndex:0];
+  [encoder setBytes:&amp;x length:sizeof(x) atIndex:1];
+  [encoder setBuffer:data offset:0 atIndex:2];
+  [encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
+  [encoder endEncoding];
+  [command_buffer commit];
+}
+
+// device code
+kernel void add_constant_kernel(
+	const int&amp; n, 
+	const float&amp; x, 
+	device float* data, 
+	uint idx [[thread_position_in_grid]]
+) {
+  if (idx &gt;= n) return;
+  data[idx] += x;
+}
+          </code>
+      </pre>
+      <!-- </dt-code> -->
+      <p>
+        I'm not really sure why there is such a big difference in the developer experience. For this particular example, it seems 
+        like both a common thing to do and fairly easy to implement a compile-time-checkable kernel dispatch syntax. 
+        Twitter has not been helpful in answering my questions.
+        That said it's possible it's much harder than I think it is because you need to be able to handle your global context, command buffer, etc. somewhere, and 
+        thus have to think carefully about how that affects other parts of your API.
+      </p>
+      <h4>Other</h4>
+      <img src="./things-april-2024-assets/xcode_shader_debugging.png" class="l-middle" alt="XCode shader validation" style="width: min(90vw, 500px);">
+      <p>
+        Metal does have some things going for it. The shader debugging experience via XCode is pretty nice; you can turn on shader validation, which will add a bunch 
+        of checks at runtime for things like invalid loads/stores. This can help catch incorrect argument encoding among other things (although a compile-time check for these types of errors is certainly preferable).
+      </p>
+      <p>
+        Also, I personally prefer the C++-like syntax of Metal to the Rust-like syntax of WGSL. This also made translation from CUDA easier.
+      </p>
+      <p>
+        <a href="https://claude.ai">Claude</a> was also extremely helpful in learning about CUDA vs Metal. It got some surprising things right, like identifying that a memory stomp bug I was running into was
+        due to alignment. However, it wasn't totally reliable, and kept thinking that I could use <code>printf</code> in my Metal shaders.
+      </p>
+      <p>
+        Overall, Metal feels like a much rougher developer experience than CUDA for me. I'm still very much a beginner to parallel programming (having only learned about things like parallel reductions in this project), 
+        so I don't feel I have a good understanding of how important the differences I highlighted are, or why they exist. However, at the very least, CUDA has been around since 2007, while Metal came out in 2014, so 
+        the former has clearly had much more time to mature.
+      </p>
+      <p>
+        The best references I found for both were:
+        </p><ul>
+          <li><a href="https://docs.nvidia.com/cuda/cuda-c-programming-guide/">The CUDA C++ Programming Guide</a></li>
+          <li><a href="https://developer.apple.com/metal/Metal-Shading-Language-Specification.pdf">The Metal Shading Language Spec</a></li>
+        </ul>
+      <p></p>
+
+      <h2>Taking the fast.ai course</h2>
+      <img src="./things-april-2024-assets/fashion_mnist.png" class="l-middle" alt="Fashion MNIST generated samples" style="width: min(90vw, 500px);">
+      <p class="caption">
+        <i>Some samples from a diffusion model trained on the Fashion-MNIST dataset as part of the fast.ai course.</i>
+      </p>
+      <p>
+        I also started taking the <a href="https://www.fast.ai/">fast.ai</a> course in April to get more hands-on experience with the models and tools behind the last few years of the AI wave. Part 1 was pretty basic and 
+        covered topics that I wasn't interested in (many older and less general techniques like decision trees, which I had learned about in my undergrad ML courses, and too much of a focus on using 
+        the fastai library), so I skipped it and moved on to part 2, which "builds Stable Diffusion from scratch".
+      </p>
+      <p>
+        Some thoughts on fastai:
+        </p><ul class="compact-li">
+          <li>The course is a solid practical resource. I feel like I now have a toolkit of libraries and recipes to approach specific deep learning tasks, which I didn't have before.</li>
+          <li>
+            For example, I'm now confident I can train a deep CNN to do image classification and other well-defined, data-rich supervised learning tasks to near-SOTA<dt-fn>Or at least good enough for production applications.</dt-fn> 
+            performance, which I would struggle with before (techniques like normalization and initialization were not emphasized when I took ML courses in undergrad).
+          </li>
+          <li>
+            I also now know some techniques for debugging models and various notebook tricks, like plotting activations with hooks and inspecting notebook variables.
+          </li>
+          <li>
+            Finally, it's nice to be exposed to the world of techniques available to deep learning practitioners, even if they are not explained in depth.
+          </li>
+        </ul>
+      <p></p>
+      <p>
+        However:
+        </p><ul class="compact-li">
+          <li>
+            A surprising amount of the course is spent on Jeremy's favorite way of coding things up (for example, spending nearly an entire lecture on refactoring a notebook into classes).
+          </li>
+          <li>
+            The lessons do not cover theory to much depth and there aren't exercises, so I don't feel like I have a good grasp on theory besides some techniques like initialization, which makes it
+            hard to know when to use one technique over another. I don't feel that the course has made me able to understand and extend the latest research nor debug arbitrary problems with large
+            foundation models on arbitrary tasks.
+          </li>
+          <li>
+            <p>
+              I'm left with some questions after each lesson, like:
+            </p>
+            <ul>
+              <li>When should I use initialization vs. normalization?</li>
+              <li>Does <a href="https://arxiv.org/abs/1511.06422">LSUV</a> work for all architectures? Can I just use that instead of specific initialization schemes? Does LayerNorm completely supersede it?</li>
+              <li>When should I use batch normalization vs. layer normalization?</li>
+              <li>When should I use learning rate annealing vs. cyclical learning rate, and what's the idea behind cyclical LR? I'm not satisfied with the claim that "momentum should be low when LR is high."</li>
+              <li>How do I decide what optimizer to use?</li>
+            </ul>
+          </li>
+          <li>
+            I was probably most unsatisfied with how diffusion was explained in the course. I explored this later in May.
+          </li>
+        </ul>
+      <p></p>
+      <p>
+        I think that I'm not used to a lecture-only, theory-light course which doesn't test me on the material afterwards. Probably students more comfortable with self-assessment, coming up with their 
+        own questions and answers, will have an easier time learning from this course.
+      </p>
+
+      <h2>Other</h2>
+      <p>
+        Still sorta tech-related: I joined South Park Commons this month. It's great having a community of interesting people to explore with and keep me accountable!
+      </p>
+      <p>
+        My favorite non-technical readings this month were:
+        </p><ul>
+          <li>
+            <a href="https://bewrong.substack.com/p/i-feel-dizzy-again">i feel dizzy (again)</a> by joodaloop: A personal essay about grappling with the dizzying pace of AI progress. I resonated with the parts about feeling 
+            rushed and being sad about "the craft" going away, and found the anecdote about persisting with bad guitar and art hopeful.
+          </li>
+          <li>
+            <a href="https://www.neelnanda.io/blog/34-learning">Learning how to learn</a> by Neel Nanda: Great blog post about all the techniques Neel found useful for learning quickly and retaining knowledge.
+            This is like the 42nd time I've come across someone I respect recommending spaced repetition for stuff other than language learning or studying for tests so it's about time I started applying it. 
+            Also great affirmation of the value in teaching something you learn to someone else, and some useful suggestions on general questions to ask domain experts.
+          </li>
+        </ul>
+      <p></p>
+      <p>
+        Here's a good quote from the joodaloop essay:
+      </p>
+      <p style="display: block; background: white; border-left: 3px solid rgba(0, 0, 0, 0.05); padding: 0 0 0 24px; color: rgba(0, 0, 0, 0.7);">
+        <i>
+          But what if you like doing things? What if your ethic is Protestant, your dedication is to the <b>craft</b>, and you just can't live without the need to be useful? 
+        </i>
+      </p>
+      <p style="display: block; background: white; border-left: 3px solid rgba(0, 0, 0, 0.05); padding: 0 0 0 24px; color: rgba(0, 0, 0, 0.7);">
+        <i>
+          What if you're like the programmers who are not mad about the possibility of losing their jobs, as much as they are sad that they can't spend the rest of their career typing ASCII characters onto a screen while thinking hard? They don't care about “prompting” an opaque model into creating business value, that's not why they got into this. 
+        </i>
+      </p>
+      <p style="display: block; background: white; border-left: 3px solid rgba(0, 0, 0, 0.05); padding: 0 0 0 24px; color: rgba(0, 0, 0, 0.7);">
+        <i>
+          You want <b>problems</b>. You want to feel smart about solving them, this is your jam. Some of you are actually sad that you cannot “grind” anymore, that things will be made <b>too</b> easy. (The grind is dead, long live the grind). I think this is as real a sadness as any other.
+        </i>
+      </p>
+      <img src="./things-april-2024-assets/suzume_chair.webp" class="l-middle" alt="Suzume" style="width: min(90vw, 600px);">
+      <p>
+        I also started a thing with friends where we watch Asian movies. We watched Suzume and argued about how the movie could've been better for two hours. My take: the movie has good bones,
+        but the theme of moving on from past trauma is undermined by the weird romance and the <i>other</i> theme of saving Japan from the earthquake worms.
+      </p>
+
+    </dt-article>
+  
+    <dt-appendix>
+    </dt-appendix>
+  
+    <script type="text/bibliography">
+    </script>
+    <script defer="" src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement(document.body);
+      });
+
+      document.querySelectorAll('.b-dics').forEach((el) => {
+          new Dics({
+            container: el,
+          });
+      })
+    </script>
+  </article>
+
+</body></html>
