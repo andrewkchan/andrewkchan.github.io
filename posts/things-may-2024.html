@@ -1,0 +1,242 @@
+<!DOCTYPE html><html><head>
+  <title>Things I did in May 2024</title>
+  <meta charset="utf-8">
+  <!-- Google tag (gtag.js) -->
+  <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
+  <!-- Sentry -->
+  <script src="https://js.sentry-cdn.com/f27e96506d16307fa97dcc9442b50117.min.js" crossorigin="anonymous"></script>
+  <script src="./template.v1.js"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-HYB0C59DXR');
+  </script>
+
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+      <script defer="" src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+  
+      <!-- Google tag (gtag.js) -->
+      <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
+      <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+  
+        gtag('config', 'G-HYB0C59DXR');
+      </script>
+  
+      <script type="text/front-matter">
+        title: "Things I did in May 2024"
+        published: June 7, 2024
+        authors:
+        - Andrew Chan: http://andrewkchan.github.io
+        affiliations:
+        -
+      </script>
+  
+      <style>
+        .caption > i {
+          font-size: 15px;
+          line-height: 1.3em;
+        }
+        .compact-li li {
+          margin-bottom: 0.5em;
+        }
+      </style>
+    </head>
+<body>
+  <dt-article>
+    <h1><a href="/" class="hero">Andrew Chan</a></h1>
+  </dt-article>
+  <hr>
+  <article class="toyb-article">
+    
+    
+    
+    <dt-article>
+      <h1>Things I did in May 2024</h1>
+      <h2>Diffusion models, Skew, and NYC.</h2>
+      <dt-byline></dt-byline>
+      <p>
+        May was less building, more experimenting, and even more reading and writing.
+      </p>
+
+      <h2>The Skew Programming Language</h2>
+      <svg width="250" height="195" fill="none" xmlns="http://www.w3.org/2000/svg" class="l-middle">
+        <rect x="3.14705" y="2.41481" width="181.567" height="181.567" transform="matrix(1 0 0.258819 0.965926 6.375 7.08228)" stroke="#7379FF" stroke-width="5"></rect>
+        <rect x="0.5" y="0.5" width="17.6567" height="17.6567" fill="#7379FF" stroke="#7379FF"></rect>
+        <rect x="183.336" y="0.5" width="17.6567" height="17.6567" fill="#7379FF" stroke="#7379FF"></rect>
+        <rect x="49.0074" y="175.873" width="17.6567" height="17.6567" fill="#7379FF" stroke="#7379FF"></rect>
+        <rect x="231.843" y="175.873" width="17.6567" height="17.6567" fill="#7379FF" stroke="#7379FF"></rect>
+        <path d="M38 32L49.2542 58.5834L66.649 35.5453L38 32ZM211.5 163L200.246 136.417L182.851 159.455L211.5 163ZM54.45 47.553L192.037 151.437L195.05 147.447L57.4629 43.5627L54.45 47.553Z" fill="#7379FF"></path>
+      </svg>
+      <p class="caption">
+        <i>Skew doesn't have a logo, so I made this in Figma.</i>
+      </p>
+      <p>
+        In early May, the company blog about one of the most interesting projects I worked on at Figma - <a href="https://www.figma.com/blog/figmas-journey-to-typescript-compiling-away-our-custom-programming-language/">
+        the quest to migrate away from our custom programming language</a> - was published.
+      </p>
+      <p>
+        I originally wrote some thoughts about Skew here, but it was getting long, so I split it into its own blog post: <a href="./skew.html"><i>The Skew Programming Language</i></a>.
+      </p>
+
+      <h2>Diffusion Models</h2>
+      <div class="l-middle">
+        <img src="./diffusion-assets/trex-viz/step000.svg" alt="Fourier features in a diffusion model" style="display: inline-block; max-width: min(40vw, 350px);">
+        <img src="./diffusion-assets/trex-viz/mlp_fourier_fourier_rescheduled.svg" alt="Fourier features in a diffusion model" style="display: inline-block; max-width: min(40vw, 350px);">
+      </div>
+      <p class="caption">
+        <i>
+            <b>Left:</b> Dataset of 2D points in the shape of a T-Rex.
+            <b>Right:</b> 1000 samples from a diffusion model trained on the dataset.
+        </i>
+      </p>
+      <p>
+        I also published a long explanation blog post about <a href="./diffusion.html">diffusion models</a>, covering background, theory, advances, and applications. 
+        It got some attention on <a href="https://news.ycombinator.com/item?id=40471419">Hacker News</a>, and I learned that the HN moderators
+        will actually re-up posts that they decide have good content if they don't make it to the front page the first time around.
+      </p>
+      <p>
+        I wrote this because I was really dissatisfied with how the fast.ai “Build Stable Diffusion from Scratch” course explained the theory behind diffusion models.
+      </p>
+      <p>
+        To its credit, it's a practical course rather than a theoretical one, but I found it frustrating that we were frequently implementing formulas with only a vague explanation of what they were doing rather than a solid understanding of why the formulas looked the way they did and what each piece meant.
+        I also wasn't satisfied with the "intuitive" explanation of diffusion that Jeremy gave, which went something like:
+        </p><ul>
+            <li>Imagine we have a neural network that gives us the probability that a set of pixels is a coherent image.</li>
+            <li>If we start with random noise pixels, then add the gradient of the probability of being an image (e.g. push it more towards being an image), we'll end up with a random coherent image.</li>
+        </ul>
+      <p></p>
+      <img src="./diffusion-assets/score_matching.png" alt="Sampling from a distribution with score matching" class="l-middle" style="max-width: min(90vw, 600px);">
+      <p class="caption">
+        <i>Sampling from a distribution by following the score. Via <a href="https://calvinyluo.com/2022/08/26/diffusion-tutorial.html">Calvin Luo's blog</a>.</i>
+      </p>
+      <p>
+        I now recognize this as an explanation of denoising score matching, but I also think it leaves out a lot of context, and left me with a lot of questions at the time, like:
+        </p><ol>
+            <li>
+                Why is this better than other approaches people have tried for generating images in the past, like GANs?<dt-fn><b>Answer:</b> GANs have mode collapse and are hard to train. Flow-based models don't have mode collapse, but aren't as expressive and are difficult to scale up.</dt-fn>
+            </li>
+            <li>
+                How does this lead to the training objective of predicting noise added to an image?<dt-fn><b>Answer:</b> Long derivation in the post!</dt-fn>
+            </li>
+            <li>
+                If we're following a gradient, why do we need to use this arbitrary-looking formula for sampling rather than a pre-existing gradient-based optimizer like Adam?<dt-fn><b>Answer:</b> We're not only following a gradient. If we do that, then we end up with a form of mode collapse during sampling.</dt-fn>
+            </li>
+        </ol>
+      <p></p>
+      <p class="caption"><i>Answers to the above are in footnotes.</i></p>
+      <p>
+        Figuring out the answers to the above questions were rough. There are many resources online explaining diffusion models, but I found them either: 
+        </p><ul>
+            <li>
+                Too practical, like fast.ai, focused on architectures and implementations of formulas, with little time spent discussing why the formulas are the way they are, or
+            </li>
+            <li>
+                Too theoretical, like the original papers,
+                or blog posts and videos made by researchers for other researchers, assuming considerable background in statistical modeling techniques like variational inference.
+            </li>
+        </ul>
+      <p></p>
+      <p>
+        I ended up writing a resource for myself which filled in all the context that I needed as a software engineer who likes understanding the <i>why</i> and <i>how</i> of new
+        technology at an intuitive level (connecting things to my existing knowledge graph), but with only an undergraduate background in math and stats from years ago. There are 
+        lots of folks out there like me, and I was happy to see that many people found the post with the visual aids and example modeling task helpful.
+      </p>
+      <p>
+        One personal thing I realized when writing the post was that I have forgotten an embarrassing amount of basic math, particularly algebra. For example, I had to stop and think for a second whether \(\sqrt{\frac{a}{b}}=\frac{\sqrt{a}}{\sqrt{b}}\). This really slowed down my understanding of proofs;
+        it was a lot easier in undergrad when I routinely exercised these skills. <a href="https://nautil.us/how-i-rewired-my-brain-to-become-fluent-in-math-rd-235086/">Memorization and repetition really is huge when it comes to learning</a>.
+      </p>
+
+      <h2>Other</h2>
+      <p>
+        I started organizing an informal ML paper reading group for South Park Commons. It's nice to be forced to read papers and catch up on hot topics. For instance, coding agents are all the rage these
+        days, so we recently read <a href="https://arxiv.org/abs/2405.15793">SWE-Agent</a>.
+      </p>
+      <p>
+        I also started participating in the run club at SPC. I got injured after my last race and so was out of commission for a while, but am getting back into running. I like running
+        because you don't need any special equipment or facilities for it - just your own two feet and a safe path to run on! It's something everyone can do, too. My dad runs marathons,
+        one day I'll run one too.
+      </p>
+      <h3>Visiting NYC</h3>
+      <p>
+        I traveled to New York for the first time in a while to visit friends and family. I hung out a lot at South Park Commons NYC, went up the Empire State Building for the first time, 
+        and ate a bunch of pizza. Some observations:
+        </p><ul>
+            <li>
+                There are a LOT more people than San Francisco. A random corner of 28th and Park in Manhattan had way more foot traffic than almost everywhere I've been to in SF!
+                It's possible this is more of a reflection of how low-density SF (and other American cities) are compared to NYC. Someone I know who grew up in a Chinese city once 
+                told me that NYC is the only place in all of the states that feels like home to them.
+            </li>
+            <li>
+                Everyone knows NYC public transit (particularly the subway) is the best in the states. But it's interesting because the MTA is clearly an aging system - in fact, probably the oldest, most grungy system I've ever been on, even in the US - 
+                it feels like it's falling apart, yet keeps muddling on, carrying millions of people every day, held together by a patchwork of upgrades and spot checks. 
+            </li>
+        </ul>
+      <p></p>
+      <p>
+        Some clear signs of age I noticed:
+        </p><ul>
+            <li>
+                The trains I rode did not announce their next stop. In fact I'm pretty sure most didn't have a PA system at all.
+            </li>
+            <li>
+                Many stations also did not have clear signage. Since it was my first time in the city and I didn't have the look of stations memorized, I mostly got 
+                around by counting the number of stops that Google Maps told me I had to take. Apparently some newer trains have digital maps (image), but the only time 
+                I saw one was when I took the train to my departing flight at JFK.
+            </li>
+            <li style="list-style-type: none;">
+                <img src="./things-may-2024-assets/nyc_subway.png" alt="Digital map in a NYC subway train" style="max-width: min(90vw, 600px);">
+            </li>
+            <li>
+                Many stations required separate entry for different directions. Moreover you had to pay each time you entered. There were a couple times where I accidentally entered the 
+                station with the uptown line, but I realized I had to go downtown, and ended up double-paying.
+            </li>
+        </ul>
+      <p></p>
+      <p>
+        Some modernizations and advantages over other systems:
+        </p><ul>
+            <li>The fare was totally digital, and you could pay via Apply Pay. No need to download a separate app or buy a special metro card!</li>
+            <li>
+                <p>
+                    The frequency is incredible for an American system. 
+                </p>
+                <ul>
+                    <li>
+                        BART and Muni trains that go underground are almost always faster than every other option, but when you add in the 10-minute-plus average wait times, 
+                        the train often ends up slower than walking or taking the bus if it's just going between spots downtown. If I enter the station while a train is coming and 
+                        I miss it, I'll usually just get out and start walking. 
+                    </li>
+                    <li>
+                        This never happens in Manhattan - there is almost no penalty to missing a train (it also helps that the stations are usually shallow, maybe because the system
+                        was dug while the city was young, before the underground had a chance to fill with pipes and other infrastructure). 
+                    </li>
+                    <li>
+                        It's funny how much I'm emphasizing this because it's something that's table stakes for a functioning subway system in most countries - I missed it a lot when 
+                        coming back from living in Taiwan for a month. 
+                    </li>
+                </ul>
+            </li>
+        </ul>
+      <p></p>
+
+    </dt-article>
+  
+    <dt-appendix>
+    </dt-appendix>
+  
+    <script type="text/bibliography">
+    </script>
+    <script defer="" src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement(document.body);
+      });
+    </script>
+  </article>
+
+</body></html>

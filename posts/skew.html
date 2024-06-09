@@ -1,0 +1,351 @@
+<!DOCTYPE html><html><head>
+  <title>The Skew Programming Language</title>
+  <meta charset="utf-8">
+  <!-- Google tag (gtag.js) -->
+  <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
+  <!-- Sentry -->
+  <script src="https://js.sentry-cdn.com/f27e96506d16307fa97dcc9442b50117.min.js" crossorigin="anonymous"></script>
+  <script src="./template.v1.js"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-HYB0C59DXR');
+  </script>
+
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+      <script defer="" src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+  
+      <!-- Google tag (gtag.js) -->
+      <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
+      <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+  
+        gtag('config', 'G-HYB0C59DXR');
+      </script>
+  
+      <script type="text/front-matter">
+        title: "The Skew Programming Language"
+        published: June 7, 2024
+        authors:
+        - Andrew Chan: http://andrewkchan.github.io
+        affiliations:
+        -
+      </script>
+  
+      <style>
+        .caption > i {
+          font-size: 15px;
+          line-height: 1.3em;
+        }
+        .compact-li li {
+          margin-bottom: 0.5em;
+        }
+      </style>
+    </head>
+<body>
+  <dt-article>
+    <h1><a href="/" class="hero">Andrew Chan</a></h1>
+  </dt-article>
+  <hr>
+  <article class="toyb-article">
+    
+    
+    
+    <dt-article>
+      <h1>The Skew Programming Language</h1>
+      <dt-byline></dt-byline>
+      <p>
+        In early May, the blog post about one of the most interesting projects I worked on at Figma - <a href="https://www.figma.com/blog/figmas-journey-to-typescript-compiling-away-our-custom-programming-language/">
+        the quest to migrate away from our custom programming language</a> - was released!
+      </p>
+      <p>
+        I won't talk more about the automated migration we did or the history behind Skew, except to say that it was a joy working with my coworker <a href="https://x.com/b_randon_lin">Brandon</a>,
+        who led the migration project and is a prolific compiler hacker and engineer. The post on the Figma blog that we wrote together contains lots of gory details (with <a href="https://news.ycombinator.com/item?id=40245686">plenty of Hacker News comments</a>),
+        and my <a href="https://x.com/andrew_k_chan/status/1786769203912925477">Twitter thread</a> has some more history.
+      </p>
+      <p>
+        Instead, I'll write a bit about the Skew programming language, which, by the way, is <a href="https://github.com/evanw/skew">open source</a> and created by Evan Wallace, who 
+        published longer documentation and a live demo <a href="https://evanw.github.io/skew-lang.org/">on his website</a>.
+      </p>
+      <h3>Interesting features of Skew</h3>
+      <p>
+        At a high level, Skew is a fairly conventional object-oriented language. Like Typescript, it has first-class functions (including lambdas), classes, interfaces, and basic generics. It's 
+        statically typed, though unlike Typescript it lacks structural or algebraic types, though it does have nominal types, which TS doesn't have. The type system is overall stricter: there is no monkey-patching
+        of objects, no object prototypes, and the types are sound, which means a value is guaranteed to be of the type it's declared as at runtime<dt-fn>Unless the <code>dynamic</code> escape hatch is used.</dt-fn>.
+      </p>
+      <p>
+        Beyond these basic features though, there are a few interesting ones. Let's go through them.
+      </p>
+      <h4>Wrapped types</h4>
+      <p>
+        This is a feature that I hadn't encountered before. I did learn recently that it's similar to Swift's <code>extension</code> and Haskell's (and Rust's) <code>newtype</code>.
+        The idea is to allow extending type aliases with "methods" that are converted to global functions at compile time. This is especially useful for aliases of primitives like
+        <code>int</code> or <code>double</code>, since you can basically treat them as zero-cost abstraction objects in your code.
+      </p>
+      <p>
+        For instance, here's the example from the Skew docs of a <code>Color</code> type encapsulating 8-bit RGBA which is just a 32-bit integer under-the-hood:
+      </p>
+      <!-- <dt-code block language="text"> -->
+        <pre class="l-middle">            <code class="language-text">
+type Color : int {
+  def r int { return ((self as int) &gt;&gt; 16) &amp; 255 }
+  def g int { return ((self as int) &gt;&gt; 8) &amp; 255 }
+  def b int { return (self as int) &amp; 255 }
+  def a int { return (self as int) &gt;&gt;&gt; 24 }
+
+  def opaque Color {
+    return new(r, g, b, 255)
+  }
+}
+
+namespace Color {
+  def new(r int, g int, b int, a int) Color {
+    return (r &lt;&lt;&lt; 16 | g &lt;&lt;&lt; 8 | b | a &lt;&lt;&lt; 24) as Color
+  }
+}
+
+@export
+def isOrange(color Color) bool {
+  return color.opaque == Color.new(255, 127, 0, 255)
+}
+            </code>
+        </pre>
+        <!-- </dt-code> -->
+        <h4>Real integer types</h4>
+        <p>
+            As explained on Twitter, Skew has a real <code>int</code> type. All modern browser engines have some optimized version 
+            of the JS <code>number</code> type which can be used as long as a number value stays within the 32-bit integer range. 
+            This was a side effect of the <a href="http://asmjs.org/spec/latest/">asm.js</a> standard, and it's something Skew was able to leverage by compiling all operations 
+            on <code>int</code> values to their asm.js equivalents.
+        </p>
+        <p>
+            Dart is the only other compile-to-JS language that I've seen also have an <code>int</code> type, but the ergonomics are looser: for example, dividing with the <code>/</code>
+            operator always returns a double (there is a special integer division operator <code>~/</code>).
+        </p>
+        <p>
+            Compare the Skew code:
+        </p>
+      <!-- <dt-code block language="text"> -->
+        <pre class="l-middle">            <code class="language-text">
+var x = 42
+var y = x / 5
+dynamic.console.log(x) # 42
+dynamic.console.log(y) # 8
+dynamic.console.log(y == 8) # True
+            </code>
+        </pre>
+        <!-- </dt-code> -->
+        <p>
+            To this Dart code:
+        </p>
+        <!-- <dt-code block language="text"> -->
+        <pre class="l-middle">            <code class="language-text">
+var x = 42;
+var y = x / 5;
+print(x); // 42
+print(y); // 8.4
+print(y == 8); // False
+print(x ~/ 5 == 8); // True
+            </code>
+        </pre>
+        <!-- </dt-code> -->
+        <h4>Flags</h4>
+        <p>
+            These are syntactic sugar for bitflags. So
+        </p>
+        <!-- <dt-code block language="text"> -->
+        <pre class="l-middle">            <code class="language-text">
+flags DirtyFlags {
+  TRANSFORM
+  BOUNDS
+  GEOMETRY
+}
+
+var flags DirtyFlags = .TRANSFORM | .GEOMETRY
+            </code>
+        </pre>
+        <!-- </dt-code> -->
+        <p>
+            Translates to the following JS:
+        </p>
+        <!-- <dt-code block language="text"> -->
+        <pre class="l-middle">            <code class="language-text">
+const DirtyFlags = {
+  TRANSFORM: 1 &lt;&lt;&lt; 0,
+  BOUNDS: 1 &lt;&lt;&lt; 1,
+  GEOMETRY: 1 &lt;&lt;&lt; 2
+}
+
+var flags = DirtyFlags.TRANSFORM | DirtyFlags.GEOMETRY
+            </code>
+        </pre>
+        <!-- </dt-code> -->
+        <p>
+            This is a very simple feature, but I haven't seen it anywhere else (you can define custom enum variants in many other languages, but it's not the same).
+        </p>
+        <h4>Customizable syntax</h4>
+        <p>
+            Some syntax in Skew is customizable. For example, there is fairly comprehensive operator overloading (which Dart and many other languages also have).
+        </p>
+        <p>
+            One of the more interesting features of Skew is custom List/Map/XML literals. Though we pretty much never used this, it was supposed to allow for
+            ergonomic custom data structures. For example, see the custom Map snippet from the docs:
+        </p>
+        <!-- <dt-code block language="text"> -->
+        <pre class="l-middle">            <code class="language-text">
+class DemoMap {
+  def {...}(key int, value int) DemoMap { return self }
+  def {...}(key string, value string) DemoMap { return self }
+}
+
+var map DemoMap = {1: 2, "3": "4"}
+            </code>
+        </pre>
+        <!-- </dt-code> -->
+        <p>
+            Custom XML literals were supposed to allow for JSX-like code:
+        </p>
+        <!-- <dt-code block language="text"> -->
+        <pre class="l-middle">            <code class="language-text">
+class Div {
+  var name string = ""
+  var id string = ""
+  var _children List<node> = []
+
+  # The compiler uses this function to append children
+  def &lt;&gt;...&lt;/&gt;(child Node) {
+    _children.append(child)
+  }
+  
+  def html string {
+	  return (
+		  "&lt;div&gt;" + 
+			"".join(_children.map<string>(c=&gt;c.html)) + 
+			"&lt;/div&gt;"
+		)
+  }
+}
+
+var tree = (
+	&lt;Div name="foo" id="1"&gt;
+		&lt;Div name="bar" id="2"&gt;
+		&lt;/Div&gt;
+		&lt;Div name="baz" id="3"&gt;
+		&lt;/Div&gt;
+	&lt;/Div&gt;
+)
+dynamic.document.body.innerHTML = tree.html
+            </string></node></code>
+        </pre>
+        <!-- </dt-code> -->
+        <h4>Name-based member access</h4>
+        <p>
+            Variable and method names starting with <code>_</code> are automatically protected (only made accessible to a class and its subclasses).
+            For example:
+        </p>
+        <!-- <dt-code block language="text"> -->
+        <pre class="l-middle">            <code class="language-text">
+class Foo {
+	var _bar = 5
+	def baz {
+		dynamic.console.log(_bar) # ok
+	}
+}
+
+def globalFunc(x Foo) {
+	dynamic.console.log(x._bar) # error
+}
+            </code>
+        </pre>
+        <!-- </dt-code> -->
+        <p>
+            I thought this was an excellent way to make the naming convention part of the language, but the implicitness made things harder
+            for developers who didn't regularly work with Skew.
+        </p>
+        <h4>Open declarations</h4>
+        <p>
+            Another unique feature of Skew is that all declarations are visible everywhere. This means there is no such thing as a module system
+            where files can choose what to expose, and there are also no import statements. Moreover, class and namespace declarations were "open" like in Ruby,
+            meaning that members from duplicate declarations in different files were merged together at compile time. For example: 
+        </p>
+        <!-- <dt-code block language="text"> -->
+        <pre class="l-middle">            <code class="language-text">
+####### foo1.sk
+class Foo {
+	var _bar = 5
+    def bar {
+        return _bar
+    }
+}
+
+####### foo2.sk
+class Foo {
+	def baz {
+        return bar + 1
+    }
+}
+def test(x Foo) {
+	dynamic.console.log(x.baz) # returns 6
+}
+            </code>
+        </pre>
+        <!-- </dt-code> -->
+        <p>
+            In retrospect, I think this made for some fairly messy code, but it was good for productivity.
+        </p>
+        <h4>Compiler optimizations</h4>
+        <p>
+            There's some more detail about this in the <a href="https://www.figma.com/blog/figmas-journey-to-typescript-compiling-away-our-custom-programming-language/">Figma blog post</a>,
+            but one of the key advantages of Skew for us was that it has an optimizing compiler that can perform advanced optimizations like devirtualization, inlining, and more aggressive constant folding
+            and dead code elimination. The reason we don't see these optimizations often for compile-to-JS languages like Typescript is that often languages attempt to keep
+            the dynamism of JavaScript, which makes applying certain optimizations unsafe (in the face of things like monkey-patching or unsound type systems).
+        </p>
+        <h3>Conclusion</h3>
+        <p>
+            Skew was (is) an incredible achievement for what started out as a hobby language while the author was also founding a company:
+            </p><ul class="compact-li">
+                <li>It has several novel features for a compile-to-JS language, including an optimizing compiler.</li>
+                <li>It's bootstrapped and has multiple backends.</li>
+                <li>It has solid documentation, <a href="https://github.com/evanw/skew-vscode">IDE support</a> with syntax highlighting/jump-to-definition/redlining, and is open source.</li>
+            </ul>
+        <p></p>
+        <p>
+            But supporting an in-house programming language is a <i>huge</i> ask if you're not a big company. I don't know of any company that has done so successfully over the long run:
+            Naughty Dog moved away from <a href="https://en.wikipedia.org/wiki/Game_Oriented_Assembly_Lisp">GOAL</a>, Fog Creek killed 
+            <a href="https://web.archive.org/web/20180203064925/http://blog.fogcreek.com/killing-off-wasabi-part-1/">Wasabi</a>, etc. The companies that have sustained languages that 
+            aren't widely used still saw them adoped by outside developers. For instance, while Jane Street is famous for using OCaml, it's also used in plenty of other places, 
+            like the Coq and Unison projects and at Facebook and Bloomberg.
+        </p>
+        <p>
+            The problem is ultimately social, not technical. In other words, it's not just that your in-house language doesn't support XYZ feature, but that
+            </p><ul>
+                <li>Organizationally,  it just adds a tiny bit of extra friction whenever other developers need to ramp up, work with it, and integrate it with external code, and these paper cuts add up.</li>
+                <li>Socially, there is no larger community or ecosystem, which means that when you encounter a problem, you'll be the only people in the world to have encountered it, and there won't be some tool or library from the community that you can just download that fixes it, and all the innovation must come from yourself.</li>
+            </ul>
+        <p></p>
+        <p>
+            At Figma, we actually recognized this early on, and Evan began efforts to move off Skew in <a href="https://www.figma.com/blog/figmas-journey-to-typescript-compiling-away-our-custom-programming-language/#converting-the-codebase">late 2019/early 2020</a>.
+            But we didn't do it for real until a few years later. All Skew code at Figma is now Typescript, an excellent language which is absolutely the right choice both for the company and for the product being built.
+            Maybe in the future I'll write a bit about some of my favorite TS features.
+        </p>
+
+    </dt-article>
+  
+    <dt-appendix>
+    </dt-appendix>
+  
+    <script type="text/bibliography">
+    </script>
+    <script defer="" src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement(document.body);
+      });
+    </script>
+  </article>
+
+</body></html>
