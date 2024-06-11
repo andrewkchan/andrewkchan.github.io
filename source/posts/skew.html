@@ -84,14 +84,37 @@ type Color : int {
 
 namespace Color {
   def new(r int, g int, b int, a int) Color {
-    return (r &lt;&lt;&lt; 16 | g &lt;&lt;&lt; 8 | b | a &lt;&lt;&lt; 24) as Color
+    return (r &lt;&lt; 16 | g &lt;&lt; 8 | b | a &lt;&lt; 24) as Color
   }
 }
 
-@export
-def isOrange(color Color) bool {
-  return color.opaque == Color.new(255, 127, 0, 255)
+def main {
+  var c = Color.new(128, 0, 0, 255)
+  dynamic.console.log(c.r)
 }
+            </code>
+        </pre>
+        <!-- </dt-code> -->
+        <p>
+            This compiles to:
+        </p>
+      <!-- <dt-code block language="javascript"> -->
+        <pre class="l-middle">
+            <code class="language-javascript">
+function main() {
+  var c = Color.$new(128, 0, 0, 255);
+  console.log(Color.r(c));
+}
+
+var Color = {};
+
+Color.r = function(self) {
+  return self >> 16 & 255;
+};
+
+Color.$new = function(r, g, b, a) {
+  return r &lt;&lt; 16 | g &lt;&lt; 8 | b | a &lt;&lt; 24;
+};
             </code>
         </pre>
         <!-- </dt-code> -->
@@ -100,8 +123,33 @@ def isOrange(color Color) bool {
             As explained on Twitter, Skew has a real <code>int</code> type. All modern browser engines have some optimized version 
             of the JS <code>number</code> type which can be used as long as a number value stays within the 32-bit integer range. 
             This was a side effect of the <a href="http://asmjs.org/spec/latest/">asm.js</a> standard, and it's something Skew was able to leverage by compiling all operations 
-            on <code>int</code> values to their asm.js equivalents.
+            on <code>int</code> values to their asm.js equivalents. For instance, this snippet of code:
         </p>
+      <!-- <dt-code block language="text"> -->
+        <pre class="l-middle">
+            <code class="language-text">
+var x int = 5
+var y = x*424242
+var z = y/4
+            </code>
+        </pre>
+        <!-- </dt-code> -->
+        <p>
+            Compiles to this JS:
+        </p>
+      <!-- <dt-code block language="javascript"> -->
+        <pre class="l-middle">
+            <code class="language-javascript">
+var __imul = Math.imul ? Math.imul : function(a, b) {
+  return (a * (b >>> 16) &lt;&lt; 16) + a * (b & 65535) | 0;
+};
+
+var x = 5;
+var y = __imul(x, 424242);
+var z = y / 4 | 0;
+            </code>
+        </pre>
+        <!-- </dt-code> -->
         <p>
             Dart is the only other compile-to-JS language that I've seen also have an <code>int</code> type, but the ergonomics are looser: for example, dividing with the <code>/</code>
             operator always returns a double (there is a special integer division operator <code>~/</code>).
@@ -155,10 +203,10 @@ var flags DirtyFlags = .TRANSFORM | .GEOMETRY
         <p>
             Translates to the following JS:
         </p>
-        <!-- <dt-code block language="text"> -->
+        <!-- <dt-code block language="javascript"> -->
         <pre class="l-middle">
-            <code class="language-text">
-const DirtyFlags = {
+            <code class="language-javascript">
+var DirtyFlags = {
   TRANSFORM: 1 &lt;&lt;&lt; 0,
   BOUNDS: 1 &lt;&lt;&lt; 1,
   GEOMETRY: 1 &lt;&lt;&lt; 2
@@ -174,6 +222,7 @@ var flags = DirtyFlags.TRANSFORM | DirtyFlags.GEOMETRY
         <h4>Customizable syntax</h4>
         <p>
             Some syntax in Skew is customizable. For example, there is fairly comprehensive operator overloading (which Dart and many other languages also have).
+            This made working in graphics code which heavily used vectors a joy: writing <code>A * (v2 - v1) + foo(-v3)</code> is much nicer than <code>A.mul(v2.sub(v1)) + foo(v3.minus())</code>!
         </p>
         <p>
             One of the more interesting features of Skew is custom List/Map/XML literals. Though we pretty much never used this, it was supposed to allow for
@@ -311,7 +360,7 @@ def test(x Foo) {
         <p>
             The problem is ultimately social, not technical. In other words, it's not just that your in-house language doesn't support XYZ feature, but that
             <ul>
-                <li>Organizationally,  it just adds a tiny bit of extra friction whenever other developers need to ramp up, work with it, and integrate it with external code, and these paper cuts add up.</li>
+                <li>Organizationally, it just adds a tiny bit of extra friction whenever other developers need to ramp up, work with it, and integrate it with external code, and these paper cuts add up.</li>
                 <li>Socially, there is no larger community or ecosystem, which means that when you encounter a problem, you'll be the only people in the world to have encountered it, and there won't be some tool or library from the community that you can just download that fixes it, and all the innovation must come from yourself.</li>
             </ul>
         </p>
@@ -324,6 +373,14 @@ def test(x Foo) {
     </dt-article>
   
     <dt-appendix>
+        <h2>Appendix</h2>
+        We wrote Skew every day at Figma for years, so we had the largest Skew codebase by far.
+        But if you're curious what a large codebase looks like, check out Evan's projects on GitHub:
+        <ul>
+            <li><a href="https://github.com/evanw/theta">theta - online equation grapher with innovative font rendering</a></li>
+            <li><a href="https://github.com/evanw/sky">sky - cross-platform text editor</a></li>
+            <li><a href="https://github.com/evanw/skew">skew - skew compiler</a></li>
+        </ul>
     </dt-appendix>
   
     <script type="text/bibliography">
