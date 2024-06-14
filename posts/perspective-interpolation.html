@@ -37,7 +37,7 @@
       </script>
   
       <style>
-        .caption > i {
+        .caption {
           font-size: 15px;
           line-height: 1.3em;
         }
@@ -56,6 +56,11 @@
       <h1>Perspective-Correct Interpolation</h1>
       <h2>...and why the original PlayStation had textures that warped when the camera moved</h2>
       <dt-byline></dt-byline>
+      <ul class="caption">
+        <li>
+          <i>Discussion on <a href="https://news.ycombinator.com/item?id=40644261">Hacker News</a>.</i>
+        </li>
+      </ul>
       <p>
         When implementing my <a href="./diff-render.html">differentiable renderer</a>, I re-learned how rasterization works. In doing so I came across my favorite 
         piece of code for the month: perspective-correct interpolation. Every modern rasterization pipeline implements this somewhere, but old rasterizers sometimes
