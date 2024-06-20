@@ -801,7 +801,8 @@ def sample(model, img_size, alpha, alpha_bar):
       </p>
       <p>
         The ControlNet method in practice applies at a per-block level rather than on the level of the entire denoising model. Based on human evaluations, it performs better
-        than alternatives like Sketch-Guided Diffusion<dt-cite key="zhang2023adding"></dt-cite>.
+        than alternatives like Sketch-Guided Diffusion<dt-cite key="zhang2023adding"></dt-cite>. It can also be combined with the low-rank adaptation (LoRA) method to allow for
+        <a href="https://huggingface.co/stabilityai/control-lora">efficient training of ControlNets on consumer GPUs</a>.
       </p>
       <h4>Inpainting</h4>
       <p>
