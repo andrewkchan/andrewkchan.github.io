@@ -142,8 +142,8 @@
     <p></p>
     <p>
       What's interesting is that most software - even native software - doesn't take advantage of the hardware features listed above, and Figma was able to exploit this. It came out in 2015 using a web standard based on 8-year old 
-      technology (WebGL) and <a href="https://medium.com/@evanwallace/easy-scalable-text-rendering-on-the-gpu-c3f4d782c5ac">GPU-based rendering algorithms</a> that were almost a decade old (<a href="https://www.microsoft.com/en-us/research/wp-content/uploads/2005/01/p1000-loop.pdf">Loop-Blinn</a> was invented in 2005),
-      but Sketch - its MacOS native competitor - <a href="https://bjango.com/articles/perfsignatures/">barely even used the GPU</a>!
+      technology (WebGL). Rendering 2D vectors on the GPU wasn't a new idea either (<a href="https://www.microsoft.com/en-us/research/wp-content/uploads/2005/01/p1000-loop.pdf">Loop-Blinn</a> was a decade old by then)
+      yet Sketch - its MacOS native competitor - <a href="https://bjango.com/articles/perfsignatures/">barely even used the GPU</a>!
     </p>
     <h3>Design tools have multiplicative complexity</h3>
     <p>
@@ -233,7 +233,7 @@
         <li>
           <p>
             We had time specifically set aside for side projects. Companies have different strategies for this: for instance, Google is famous for letting employees spend 20% of their time on 
-            side projects. Our policies were a bit more ad-hoc, but we had both explicit time in the form of "maker weeks" and implicit time in the form of extra-long holidays<dt-fn>
+            side projects. Our policies were a bit more ad-hoc, but we had both explicit time in the form of "maker weeks" (which were actually a whole week long) and implicit time in the form of extra-long holidays<dt-fn>
             Obviously, you were not expected to do any work over the holidays, and I think now that we're a large company most people should and do use them for recharging. But work was not discouraged 
             either, and when you're heavily invested in a small startup and have nothing else going on...</dt-fn>.
           </p>
@@ -263,9 +263,8 @@
     <p>
       Another interesting question is when side project culture doesn't add value anymore. As with so many things in company cultures, I think side projects don't really scale with company size.
       In the early days of a startup, folks are much more incentivized to spend their free time on exploring ideas that are genuinely relevant to the business, since they have a greater stake in
-      its success. But in larger companies I'd guess that the ideas folks explore if given the opportunity would be more driven by what is better for their own careers, and only relevant to the company
-      insofar as they fulfill "hack time" requirements and come from opportunities in the company's systems. There's also the classic innovator's dilemma where incumbents with precious existing businesses
-      mmay feel pressure to be conservative and take less risks in revolutionary new ideas, hence tossing cold water on any side projects that might threaten the status quo.
+      its success. But larger companies are often more averse to revolutionary new ideas due to having well-established businesses, and I'd guess that the ideas folks explore if given the opportunity 
+      would be more driven by what is better for their own careers, and only relevant to the company insofar as they fulfill "hack time" requirements and come from opportunities in the company's systems.
     </p>
     <p>
       <b>Geeks attracted to a weird tech stack</b>. We had (and still have) a stellar team with lots of browser and graphics hackers who had cut their teeth in the 90s and 00s, I think because of our
