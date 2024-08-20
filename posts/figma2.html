@@ -1,5 +1,5 @@
 <!DOCTYPE html><html><head>
-  <title>Reflections on Figma II: Engineering Learnings</title>
+  <title>Notes on Figma II: Engineering Learnings</title>
   <meta charset="utf-8">
   <!-- Google tag (gtag.js) -->
   <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
@@ -28,7 +28,7 @@
     </script>
 
     <script type="text/front-matter">
-      title: "Reflections on Figma II: Engineering Learnings"
+      title: "Notes on Figma II: Engineering Learnings"
       published: August 17, 2024
       authors:
       - Andrew Chan: http://andrewkchan.github.io
@@ -57,11 +57,11 @@
   <toyb-draft></toyb-draft>
   
   <dt-article>
-    <h1>Reflections on Figma II: Engineering Learnings</h1>
+    <h1>Notes on Figma II: Engineering Learnings</h1>
     <h2></h2>
     <dt-byline></dt-byline>
     <p>
-      This is part II of my reflections on Figma, which will focus on my technical and non-technical learnings from Figma - problems in our domain, how I grew as an engineer, and how Figma's culture shaped our work.
+      This is part II of my notes on Figma, which will focus on my technical and non-technical learnings from Figma - problems in our domain, how I grew as an engineer, and how Figma's culture shaped our work.
       The first part, which talks about what brought me to Figma and my take on why Figma succeeded in the verticals we entered is <a href="/posts/figma.html">here</a>.
     </p>
     <h2>What technical things did I learn at Figma?</h2>
@@ -132,10 +132,6 @@
               interesting going on, it's just that fast-enough algorithms could be implemented fairly straightforwardly on older architectures with only vertex and fragment shaders, and beyond that, most use cases of our product
               would benefit more from optimizing other, more CPU-bound parts of the system.
             </li>
-            <li>
-              But if you need to write closer to the metal or do complex things with compute shaders, you're out of luck with WebGL, which not only lacks the latter but has to pass through an extra translation layer called ANGLE
-              on almost all major web browsers which emulates OpenGL using the OS-native graphics API (which itself may have extra driver overhead on some platforms).
-            </li>
           </ul>
         </li>
       </ul>
@@ -166,8 +162,47 @@
       </ul>
     <p></p>
     <p>
-      We only have two types of objects and a handful of operations and info panels, yet we already need to consider how resizing can behave differently given object types, or how the right-hand panel might behave differently given heterogeneous selections. Some of these questions are more product-related (how resizing a selection of multiple objects should behave), while others 
+      We only have two types of objects and a handful of operations and info panels, yet we already need to consider how resizing can behave differently given different object types, or how the right-hand panel might behave differently given heterogeneous selections. Some of these questions are more product-related (how resizing a selection of multiple objects should behave), while others 
       are more engineering-related (how we might efficiently handle reflowing large amounts of text). And this is all before we throw in multiplayer, auto-layout, and components!
+    </p>
+    <h3>Crucial re-architectures</h3>
+    <p>
+      I joined Figma at a unique time in the codebase's health where - a few years after the initial launch and the team building as fast as possible - the business was beginning to really take off but the accumulated tech debt was on the verge of 
+      catching up to us.
+    </p>
+    <p>
+      The codebase had a kernel of tight, well-documented systems which came from the earliest years of the company's existence (before Figma was released, when the team was small and had time to internally iterate), but beyond that, accidental complexity abounded. When newcomers asked “why does X system work this way”, a common refrain was: it's just like that, because we were building 
+      under pressure, that's what we came up with, and we never had time to rethink it! 
+    </p>
+    <p>
+      The underlying reason was, of course, competitive pressure. Our tech had given us a head start at launch, but our competitors had taken notice, and by 2019 were furiously chasing after us in collaboration features and threatening to pull ahead in editor features like auto-layout and prototyping animations. 
+    </p>
+    <p>
+      So the prevailing sense in the editor teams was urgency, and while we did strive to perfect the design of our features before releasing them, the engineering behind them often took on considerable debt. This led to some weird code: for example, to ship auto-layout, we built two separate layout engines managing 
+      different parts of the document with some overlap, which was a constant source of subtle bugs and performance issues for years after. It also meant that learning all the weird quirks of the engine became perhaps more valuable than being a fast problem solver<dt-fn>I'm biased, because I spent years as a platform engineer, 
+      and probably was better at doing the former than the latter.</dt-fn>, because at times the former was needed to get anything done at all.
+    </p>
+    <p>
+      One time where this came to a head was in the architecture behind our components feature: our original architecture had a ton of accidental complexity and made important operations very difficult to 
+      reason about. This was blocking several key features, so the team decided to bite the bullet and completely redesign it, which required two huge projects (an intermediate architecture, and a final one), 
+      each designing a new system, refactoring the engine, and migrating over all documents. The last bit required creating a system for file-wide migrations in our backend, which we had somehow gone for years without having. 
+      It was a heroic effort, and succeeded I think because of engineers like <a href="https://x.com/joeyliaw">Joey Liaw</a>, who led the project and had also been part of the healthcare.gov rescue team.
+    </p>
+    <p>
+      That said, some re-architectures failed, even the ones with the same hero engineers working on them. For instance, a large project to rework the engine's core datastructures in 2018 failed. 
+      But these failures were not critical, partly because we always undertook them in a way that didn't disrupt ongoing product development.
+    </p>
+    <p>
+      So what happened? Did we just get lucky? If I had to pick a dividing line between the failures and successes, it's that the successes always had a product goal in mind ahead-of-time. 
+      For instance, both the components re-architecture and another mobile viewer re-architecture I worked on aimed at unlocking a product roadmap, with the latter also improving performance. 
+      The failures, on the other hand, aimed to make code easier to reason about - meaning “reduce bugs” - but without a strong notion of <i>why</i> the bugs being reduced were so important that 
+      a couple senior engineers needed to be tied up for a few months. It's also no coincidence that the product goal was usually easier to objectively measure while goals around 
+      reducing bugs often weren't.
+    </p>
+    <p>
+      Here's what I'd claim: these product-driven re-architectures were crucial to our success, and while they sometimes required heroic efforts to succeed, this wasn't a symptom of dysfunction; 
+      instead, in the early days it was optimal for us to go through these cycles of building fast and taking on debt, then attempt refactors as needed, because we were racing to stay ahead of 
+      our competitors in a fast-moving space.
     </p>
     <h2>What non-technical things did I learn at Figma?</h2>
     <h3>The Mythical Stakeholder Alignment</h3>
@@ -175,7 +210,7 @@
       I spent my first couple years as a product engineer. I was not a very good product engineer.
     </p>
     <p>
-      I had a habit of misunderstanding or interpreting ambiguous requirements in ways that increased scope (because of the same instincts that would lead me to work on the platform - everything had to be <i>clean</i> and <i>performant</i>!). But because I was good at fixing bugs fast and soaking up trivia about the codebase, 
+      I was ignorant of the urgent dynamics in the editor product at the time, and had a habit of misunderstanding or interpreting ambiguous requirements in ways that increased scope (because of the same instincts that would lead me to work on the platform - everything had to be <i>clean</i> and <i>performant</i>!). But because I was good at fixing bugs fast and soaking up trivia about the codebase, 
       I was trusted by the team to take on larger projects and maybe mistakenly seen as a high performer.
     </p>
     <p>
