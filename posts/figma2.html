@@ -165,6 +165,7 @@
       We only have two types of objects and a handful of operations and info panels, yet we already need to consider how resizing can behave differently given different object types, or how the right-hand panel might behave differently given heterogeneous selections. Some of these questions are more product-related (how resizing a selection of multiple objects should behave), while others 
       are more engineering-related (how we might efficiently handle reflowing large amounts of text). And this is all before we throw in multiplayer, auto-layout, and components!
     </p>
+    <h2>What non-technical things did I learn at Figma?</h2>
     <h3>Crucial re-architectures</h3>
     <p>
       I joined Figma at a unique time in the codebase's health where - a few years after the initial launch and the team building as fast as possible - the business was beginning to really take off but the accumulated tech debt was on the verge of 
@@ -204,7 +205,6 @@
       instead, in the early days it was optimal for us to go through these cycles of building fast and taking on debt, then attempt refactors as needed, because we were racing to stay ahead of 
       our competitors in a fast-moving space.
     </p>
-    <h2>What non-technical things did I learn at Figma?</h2>
     <h3>The Mythical Stakeholder Alignment</h3>
     <p>
       I spent my first couple years as a product engineer. I was not a very good product engineer.
@@ -214,13 +214,13 @@
       I was trusted by the team to take on larger projects and maybe mistakenly seen as a high performer.
     </p>
     <p>
-      In my first year, this led to me working solo on a refactor which had to be scrapped after a few months because I thought it needed to support more than it actually needed to. At the time it felt catastrophic, but looking back it wasn't all that bad - it wasn't something especially important to the rest of the company but was a big learning moment for me.
+      In my first year, this led to me working solo on a refactor which had to be scrapped after a few months because I thought it needed to support more than it actually needed to. At the time it felt catastrophic, but looking back it wasn't all that bad - the failure didn't significantly impact the rest of the company but was a big learning moment for me.
     </p>
     <p>
       On the other hand, I suspect my stint as a poor product engineer made me a better platform engineer: I knew what it was like to interface with product and design folks, what they valued and how they communicated it, and how to use this to flush out the biggest risks and distill the highest priority requirements.
     </p>
     <p>
-      For instance, in a later project I led that overhauled our whiteboarding renderer to improve FPS, while our initial idea (throttling canvas rendering to improve overall responsiveness) seemed concerning to basically everyone working on on-canvas features, we were able to quickly establish that the optimization could activate selectively and usefully, that 
+      For instance, I led a later project that overhauled our whiteboarding renderer to improve FPS, and our initial idea (throttling canvas rendering to improve overall responsiveness) seemed concerning to basically everyone working on on-canvas features. However, we were able to quickly establish that the optimization could activate selectively and usefully, that 
       the critical times where it had to be disabled were few and far between, and that risks like system de-synchronization either weren't issues or could be easily mitigated.
     </p>
     <p>
@@ -237,7 +237,6 @@
       <b>Importance of side projects</b>. At Figma, we had a culture that encouraged side projects - toys or programs that folks would create which nobody asked them to, which did not necessarily have an impact
       on the bottom line, but which could be used to explore new ideas or technologies. Many features and innovations came out of side projects. Just off the top of my head:
       </p><ul class="compact-li">
-        <li>Our custom programming language, Skew</li>
         <li>Our internal offline document inspector, figmascope</li>
         <li>A performance profiling tool (also widely used outside of Figma), <a href="https://github.com/jlfwong/speedscope">speedscope</a></li>
         <li>The <a href="https://www.figma.com/widget-docs/figma-figjam-widgets/">widgets feature</a> where you could make React components that went on the Figma canvas</li>
@@ -268,13 +267,17 @@
         <li>
           <p>
             We had time specifically set aside for side projects. Companies have different strategies for this: for instance, Google is famous for letting employees spend 20% of their time on 
-            side projects. Our policies were a bit more ad-hoc, but we had both explicit time in the form of "maker weeks" (which were actually a whole week long) and implicit time in the form of extra-long holidays<dt-fn>
+            side projects. Our policies were a bit more ad-hoc, but we had both explicit time in the form of "maker weeks" (which were twice a year and actually a whole week long each) and implicit time in the form of extra-long holidays<dt-fn>
             Obviously, you were not expected to do any work over the holidays, and I think now that we're a large company most people should and do use them for recharging. But work was not discouraged 
             either, and when you're heavily invested in a small startup and have nothing else going on...</dt-fn>.
           </p>
         </li>
       </ul>
     <p></p>
+    <img class="l-middle" src="./figma-assets/water.jpeg" alt="WebGL Water" style="max-width: min(80vw, 500px);">
+    <p class="caption">
+      <i>The sculpture of the "WebGL Water" demo seen in the Figma office before the pandemic.</i>
+    </p>
     <p>
       Why were side projects important to us?
       </p><ul class="compact-li">
