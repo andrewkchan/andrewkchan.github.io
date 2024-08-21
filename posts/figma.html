@@ -1,5 +1,5 @@
 <!DOCTYPE html><html><head>
-  <title>Notes on Figma I: A Game-Changing Product</title>
+  <title>Notes from Figma I: Succeeding in Design</title>
   <meta charset="utf-8">
   <!-- Google tag (gtag.js) -->
   <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
@@ -28,7 +28,7 @@
     </script>
 
     <script type="text/front-matter">
-      title: "Notes on Figma I: A Game-Changing Product"
+      title: "Notes from Figma I: Succeeding in Design"
       published: August 16, 2024
       authors:
       - Andrew Chan: http://andrewkchan.github.io
@@ -57,7 +57,7 @@
   <toyb-draft></toyb-draft>
   
   <dt-article>
-    <h1>Notes on Figma I: A Game-Changing Product</h1>
+    <h1>Notes from Figma I: Succeeding in Design</h1>
     <h2></h2>
     <dt-byline></dt-byline>
     <p>
@@ -98,14 +98,13 @@
       But most of my work was as a platform engineer in the core engine. Some highlights:
       </p><ul class="compact-li">
         <li>
-          I put the C++ engine used by our editor into our mobile app. One of the cooler technologies we developed as part of this was a 
-          high-performance API from WASM/C++ to TypeScript.
+          I put our editor engine into our mobile app/prototype viewer.
         </li>
         <li>
           I helped migrate all code written in our <a href="/posts/skew.html">custom programming language</a> to Typescript with an automated migration.
         </li>
         <li>
-          I worked on the stability of our mobile app a bunch, implementing optimizations from incremental document loading to binary serialization improvements.
+          I worked on stability and performance a bunch, implementing optimizations from incremental document loading to serialization improvements.
         </li>
         <li>
           I also worked on the rendering performance of our whiteboarding tool, doing things like doubling FPS in intensive multiplayer scenarios.
@@ -161,7 +160,7 @@
     <p>
       An interesting and ongoing question is whether Figma can repeat the success it had in design with other products. From the trenches, it was difficult to tell how successful a new product would be; 
       most new initiatives were perceived as potential game-changers for the industry and shiny new projects that everyone (or at least all product engineers) wanted to work on because of all the attention 
-      they were getting. Here are two initiatives that stood out to me in my time there (there were others too, like Dev Mode and Slides, but I was less close to those):
+      they were getting. Here are two that stood out to me in my time there (there were others too, like Dev Mode and Slides, but I was less close to those):
       </p><ul>
         <li>
           <b>Community</b>. 
@@ -183,18 +182,19 @@
       </ul>
     <p></p>
     <p>
-      One clear thing to me is that Figma's astounding success in design was due in large part to the company identifying a gap in the design space and working on it essentially in secret for years, 
-      with early folks like <a href="https://rsms.me/">Rasmus</a> forming strong opinions on nearly every aspect of the product-to-be, which we would spend the next few years realizing in fairly 
+      One clear thing to me is that Figma's astounding success in design was due in large part to the company identifying a gap in the design space and working on it essentially in secret for years
+      <dt-fn>Although I've been told the company also came pretty close to failing because of how unusually long it went without making money. So this is a risky strategy.</dt-fn>.
+      Folks like <a href="https://rsms.me/">Rasmus</a> and <a href="https://x.com/skuwamoto">Sho</a> formed strong opinions on nearly every aspect of the product-to-be, which we would spend the next few years realizing in fairly 
       recognizable form. I will make this claim mostly without evidence, but suffice to say that many features like auto-layout and component variants had their bones laid out years in advance 
       (although most newer features like variables were designed later AFAIK). 
     </p>
-    <h2>Anecdotes about the journey</h2>
+    <h2>Anecdotes from the journey</h2>
     <p>
       <b>Cheap startup</b>.
       While Figma was venture-funded by several big names and was already Series C by the time I joined, they still gave off a strong frugality vibes initially. Their new grad salaries were lower 
-      than other offers I had at the time (even from other startups), they didn't hold any flashy recruitment events like inviting candidates to come drink on a boat, and a recruiter bragged about 
-      a brand-new filtered water machine as if it was the peak of luxury when I visited the office. We also didn't have any salespeople for a long time, and only bought our first billboards in SF 
-      a few months after I joined, around four years after the product was first announced and seven years after it was founded.
+      than other offers I had at the time (even from other startups), there were no free dinners, they didn't hold any flashy recruitment events like inviting candidates to come drink on a boat, 
+      and a recruiter bragged about a brand-new filtered water machine as if it was the peak of luxury when I visited the office. We also didn't have any salespeople for a long time, and only 
+      bought our first billboards in SF a few months after I joined, around four years after the product was first announced and seven years after it was founded.
     </p>
     <p>
       Of course, Figma at the time had only begun to make money, having stayed in stealth for longer than most companies, and was rightfully keeping lean and focusing investment into development. 
@@ -218,9 +218,39 @@
       blueprints that become unused due to all their instances being deleted or pointed to newer versions of components. At some point the documents of our biggest and most important 
       customers started crashing, and engineers had to go in and manually fix them.
     </p>
+    <p>
+      <b>The Anti-Startup</b>.
+      Despite being started by a couple of college students, Figma had an impressive share of senior engineers and designers early on. Key early hires had decades of experience
+      at companies like Adobe and Electronic Arts. 
+    </p>
+    <p>
+      My understanding is that this was something Dylan intentionally did, which together with being frugal ran counter to the established wisdom of the time, where startups 
+      inspired by Dropbox, Facebook, etc. would focus on hiring smart, hungry young people willing to work long hours. Seems like it worked well for the goal of taking an 
+      old-school power tool and putting it on the web: key functionality like a big chunk of our rendering could be created via brain dump rather than painstakingly re-invented 
+      via trial and error!
+    </p>
+    <p>
+      <b>How multiplayer was born</b>.
+      Multiplayer was added a few years before my time; the <a href="https://www.figma.com/blog/how-figmas-multiplayer-technology-works/">blog post about it</a> was one of the biggest reasons I joined. Behind the scenes, the tech was a struggle and took months to figure out: 
+      <a href="https://www.rykap.com/">Ryan</a> shared this anecdote with me about working with <a href="https://madebyevan.com/">Evan</a> on it:
+    </p>
+    <p style="display: block; background: white; border-left: 3px solid rgba(0, 0, 0, 0.05); padding: 0 0 0 24px; color: rgba(0, 0, 0, 0.7);">
+      <i>
+        This sounds crazy but I feel like Evan just read some random posts online, didn't like the vibe of anything academic, and thought really hard. In contrast I read papers and emailed professors… and his is the approach that worked.
+      </i>
+    </p>
+    <p style="display: block; background: white; border-left: 3px solid rgba(0, 0, 0, 0.05); padding: 0 0 0 24px; color: rgba(0, 0, 0, 0.7);">
+      <i>
+        One lesson I take from this is that I was trying to outsource my thinking to academics and people I thought were smarter than me. I thought that would yield a better solution, but it turned out not to be the best approach for Figma. Home-grown solutions for stuff like distributed systems/databases feel like "bad engineering" but in Figma's case ended up being pretty important for its success.
+      </i>
+    </p>
   </dt-article>
 
   <dt-appendix>
+    <h3>Acknowledgements</h3>
+    <p>
+      Thanks to Rudi Chen, Ryan Kaplan, and Jamie Wong for valuable feedback, quotes, and suggestions on multiple revisions of this post.
+    </p>
   </dt-appendix>
 
   <script type="text/bibliography">

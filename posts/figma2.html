@@ -1,5 +1,5 @@
 <!DOCTYPE html><html><head>
-  <title>Notes on Figma II: Engineering Learnings</title>
+  <title>Notes From Figma II: Engineering Learnings</title>
   <meta charset="utf-8">
   <!-- Google tag (gtag.js) -->
   <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
@@ -28,7 +28,7 @@
     </script>
 
     <script type="text/front-matter">
-      title: "Notes on Figma II: Engineering Learnings"
+      title: "Notes From Figma II: Engineering Learnings"
       published: August 17, 2024
       authors:
       - Andrew Chan: http://andrewkchan.github.io
@@ -57,12 +57,12 @@
   <toyb-draft></toyb-draft>
   
   <dt-article>
-    <h1>Notes on Figma II: Engineering Learnings</h1>
+    <h1>Notes From Figma II: Engineering Learnings</h1>
     <h2></h2>
     <dt-byline></dt-byline>
     <p>
       This is part II of my notes on Figma, which will focus on my technical and non-technical learnings from Figma - problems in our domain, how I grew as an engineer, and how Figma's culture shaped our work.
-      The first part, which talks about what brought me to Figma and my take on why Figma succeeded in the verticals we entered is <a href="/posts/figma.html">here</a>.
+      The first part, which talks about what brought me to Figma and my take on why Figma succeeded is <a href="/posts/figma.html">here</a>.
     </p>
     <h2>What technical things did I learn at Figma?</h2>
     <h3>Constraints of the web</h3>
@@ -76,7 +76,8 @@
         </li>
         <li>
           <b>64-bit memory</b>: As of July 2024 WebAssembly still only supports 32-bit addressing, meaning 4GB is the most memory you'll ever be able to work with, short of tricks like paging out to 
-          JavaScript. In fact, even 4GB wasn't possible in Chrome until 2020 <a href="https://v8.dev/blog/4gb-wasm-memory">due to limitations in V8</a>.
+          JavaScript. In fact, even 4GB wasn't possible in Chrome until 2020 <a href="https://v8.dev/blog/4gb-wasm-memory">due to limitations in V8</a>. This meant we would actually run into
+          out-of-memory issues on desktop, which came as a surprise to users running top-of-the-line machines that could handle other apps just fine.
         </li>
         <li>
           <b>SIMD</b>: This is still just a WebAssembly proposal, albeit one with decent support in the major browsers (just not older versions of iOS Safari!).
@@ -172,7 +173,7 @@
       catching up to us.
     </p>
     <p>
-      The codebase had a kernel of tight, well-documented systems which came from the earliest years of the company's existence (before Figma was released, when the team was small and had time to internally iterate), but beyond that, accidental complexity abounded. When newcomers asked “why does X system work this way”, a common refrain was: it's just like that, because we were building 
+      The codebase had a foundation of tight, well-documented systems which came from the earliest years of the company (before Figma was released, when the team was small and had time to internally iterate), but beyond that, accidental complexity abounded. When newcomers asked “why does X system work this way”, a common refrain was: it's just like that, because we were building 
       under pressure, that's what we came up with, and we never had time to rethink it! 
     </p>
     <p>
@@ -185,8 +186,8 @@
     </p>
     <p>
       One time where this came to a head was in the architecture behind our components feature: our original architecture had a ton of accidental complexity and made important operations very difficult to 
-      reason about. This was blocking several key features, so the team decided to bite the bullet and completely redesign it, which required two huge projects (an intermediate architecture, and a final one), 
-      each designing a new system, refactoring the engine, and migrating over all documents. The last bit required creating a system for file-wide migrations in our backend, which we had somehow gone for years without having. 
+      reason about. This was blocking several key features, so the team decided to bite the bullet and completely redesign it, which required two huge combined refactoring-and-migration projects, and the 
+      creation of a system for file-wide migrations in our backend, which we had somehow gone for years without having. 
       It was a heroic effort, and succeeded I think because of engineers like <a href="https://x.com/joeyliaw">Joey Liaw</a>, who led the project and had also been part of the healthcare.gov rescue team.
     </p>
     <p>
@@ -305,8 +306,9 @@
       would be more driven by what is better for their own careers, and only relevant to the company insofar as they fulfill "hack time" requirements and come from opportunities in the company's systems.
     </p>
     <p>
-      <b>Geeks attracted to a weird tech stack</b>. We had (and still have) a stellar team with lots of browser and graphics hackers who had cut their teeth in the 90s and 00s, I think because of our
-      app's unique tech stack which made it like a <a href="https://www.figma.com/blog/building-a-professional-design-tool-on-the-web/">browser within a browser</a> or an <a href="https://www.youtube.com/watch?v=opGoe7yHHkk">MMO</a>.
+      <b>Geeks attracted to a weird tech stack</b>. We had (and still have) a stellar team with lots of browser and graphics hackers who had cut their teeth in the 90s and 00s. Partly we made intentional 
+      hiring decisions early on, but I think we were attractive because of our app's unique tech stack which made it like a <a href="https://www.figma.com/blog/building-a-professional-design-tool-on-the-web/">browser within a browser</a> 
+      or an <a href="https://www.youtube.com/watch?v=opGoe7yHHkk">MMO</a>.
       For example, among my colleagues were a teammate who interned at Netscape and worked at Mozilla through the birth of the open web platform, and multiple other teammates who'd built videogames during the "masters of doom" early 3D era.
     </p>
     <p>
@@ -363,6 +365,10 @@
   </dt-article>
 
   <dt-appendix>
+    <h3>Acknowledgements</h3>
+    <p>
+      Thanks to Rudi Chen, Ryan Kaplan, and Jamie Wong for valuable feedback, quotes, and suggestions on multiple revisions of this post.
+    </p>
   </dt-appendix>
 
   <script type="text/bibliography">
