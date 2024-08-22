@@ -112,8 +112,18 @@
           <b>SIMD</b>: This is still just a WebAssembly proposal, albeit one with decent support in the major browsers (just not older versions of iOS Safari!).
         </li>
         <li>
-          <b>Screen recording and color picking</b>: <code>getDisplayMedia</code> only reached widespread support in mid 2019. This was relevant for the "eye dropper" functionality in design tools where you can click anywhere on the canvas to get the color value at that point.
-          Previously, to use the eye dropper in Framer, you had to download the desktop version, but they eventually added the functionality via screen recording in Framer Web. The EyeDropper API was launched in late 2021 and is still only available in Chromium and Firefox browsers.
+          <p>
+            <b>Screen recording and color picking</b>: <code>getDisplayMedia</code> only reached widespread support in mid 2019. The EyeDropper API was launched in late 2021 and is still only available in Chromium and Firefox browsers.
+          </p>
+          <ul class="compact-li">
+            <li>
+              This is relevant for the "eye dropper" functionality in design tools where you can click anywhere on the canvas to get the color value at that point. Different tools had to hack around this limitation
+              in different ways. For Figma, since we built our own rendering stack from scratch, we were able to implement our own color picker without the use of these APIs.
+            </li>
+            <li>
+              But for our competitors using the DOM for rendering, this was a major limitation. For instance, for a long time, to use the eye dropper in Framer, you had to download the desktop version, but they eventually added the functionality via screen recording in Framer Web.
+            </li>
+          </ul>
         </li>
         <li>
           <p>
