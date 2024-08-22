@@ -32,16 +32,47 @@
       .compact-li li {
         margin-bottom: 0.5em;
       }
+      #toc {
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            overflow: scroll;
+            line-height: 0.3em;
+            width: calc(984px - 648px);
+        }
+        @media (min-width: 1280px) {
+            #toc {
+                margin-right: 72px;
+                position: sticky; 
+                top: 72px;
+                z-index: 2;
+            }
+            #trex-noise-schedule-container { 
+                white-space: nowrap;
+            }
+            #trex-noise-schedule-gutter { 
+                margin-right:calc((100vw - 984px) / 2); 
+                z-index: 10 
+            }
+        }
+        #toc > li {
+            list-style-type: none;
+        }
+        .l-gutter {
+            position: relative;
+            background-color: white;
+        }
     </style>
   </toyb-head>
   <dt-article>
+    <div class="l-gutter caption" id="toc"><h4>Contents</h4></div>
     <h1>Notes from Figma I: How We Succeeded In Design</h1>
     <h2></h2>
     <dt-byline></dt-byline>
     <p>
       It's been a few months since I left Figma, so I thought I'd write down some notes on my time there before I forget.
+      In this first part, I'll talk about what brought me to Figma and my take on why Figma succeeded. Part II on engineering learnings and culture is <a href="/posts/figma2.html">here</a>.
     </p>
-    <h2>Why did I work at Figma?</h2>
+    <h2 id="section-">Why did I work at Figma?</h2>
     <p>
       The biggest reason was the product. A designer friend introduced me to it around 2017 when designing the website for my college club and there was nothing like it: 
       a fully-featured, highly opinionated design tool on the web with Google-docs-style single-source-of-truth, unprecedented smooth performance, and pixel-perfect rendering. 
@@ -67,7 +98,7 @@
       that I did and made a rational decision to bet on Figma. Finally, Figma actually gave me the most reverse interviewees, so I had the clearest picture of what working there was actually like as opposed to 
       the other companies I was considering at the time.
     </p>
-    <h2>What did I do at Figma?</h2>
+    <h2 id="section-">What did I do at Figma?</h2>
     <p>
       I joined in 2019 when Figma was fewer than 100 employees. When I left in early 2024, we were over 1500 employees.
     </p>
@@ -163,7 +194,7 @@
       recognizable form. I will make this claim mostly without evidence, but suffice to say that many features like auto-layout and component variants had their bones laid out years in advance 
       (although most newer features like variables were designed later AFAIK). 
     </p>
-    <h2>Anecdotes from the journey</h2>
+    <h2 id="section-">Anecdotes from the journey</h2>
     <p>
       <b>Cheap startup</b>.
       While Figma was venture-funded by several big names and was already Series C by the time I joined, they still gave off a strong frugality vibes initially. Their new grad salaries were lower 
@@ -235,5 +266,26 @@
     document.addEventListener("DOMContentLoaded", function() {
       renderMathInElement(document.body);
     });
+    const toc = document.getElementById("toc");
+    const sections = document.querySelectorAll(`[id^=section-]`);
+    for (let section of sections) {
+      const h = section.tagName;
+      const title = section.textContent;
+      const id = section.id;
+      const a = document.createElement("a");
+      a.href = `#${id}`;
+      a.textContent = title;
+      const li = document.createElement("li");
+      li.classList.add(`toc-${h}`);
+      for (let i = 0; i < id.length; i++) {
+          if (id[i] === ".") {
+              const tab = document.createElement("span");
+              tab.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+              li.appendChild(tab);
+          }
+      }
+      li.appendChild(a);
+      toc.appendChild(li);
+    }
   </script>
 </toyb-post>

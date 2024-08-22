@@ -44,6 +44,35 @@
       .compact-li li {
         margin-bottom: 0.5em;
       }
+      #toc {
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            overflow: scroll;
+            line-height: 0.3em;
+            width: calc(984px - 648px);
+        }
+        @media (min-width: 1280px) {
+            #toc {
+                margin-right: 72px;
+                position: sticky; 
+                top: 72px;
+                z-index: 2;
+            }
+            #trex-noise-schedule-container { 
+                white-space: nowrap;
+            }
+            #trex-noise-schedule-gutter { 
+                margin-right:calc((100vw - 984px) / 2); 
+                z-index: 10 
+            }
+        }
+        #toc > li {
+            list-style-type: none;
+        }
+        .l-gutter {
+            position: relative;
+            background-color: white;
+        }
     </style>
   </head>
 <body>
@@ -56,6 +85,7 @@
   
   
   <dt-article>
+    <div class="l-gutter caption" id="toc"><h4>Contents</h4></div>
     <h1>Notes From Figma II: Engineering Learnings</h1>
     <h2></h2>
     <dt-byline></dt-byline>
@@ -63,8 +93,8 @@
       This is part II of my notes on Figma, which will focus on my technical and non-technical learnings from Figma - problems in our domain, how I grew as an engineer, and how Figma's culture shaped our work.
       The first part, which talks about what brought me to Figma and my take on why Figma succeeded is <a href="/posts/figma.html">here</a>.
     </p>
-    <h2>What technical things did I learn at Figma?</h2>
-    <h3>Constraints of the web</h3>
+    <h2 id="section-">What technical things did I learn at Figma?</h2>
+    <h3 id="section-.">Constraints of the web</h3>
     <p>
       The web's unparalleled distribution is a double-edged sword. It's a single platform with vast reach: not only is it write once, run anywhere for developers, but it's zero install, instant play for end users.
       But its universality means it moves slowly. In many ways it's a highly constrained, backwards platform only now catching up to decade-old developments in hardware and low-level technologies. For example:
@@ -141,7 +171,7 @@
       technology (WebGL). Rendering 2D vectors on the GPU wasn't a new idea either (<a href="https://www.microsoft.com/en-us/research/wp-content/uploads/2005/01/p1000-loop.pdf">Loop-Blinn</a> was a decade old by then)
       yet Sketch - its MacOS native competitor - <a href="https://bjango.com/articles/perfsignatures/">barely even used the GPU</a>!
     </p>
-    <h3>Design tools have multiplicative complexity</h3>
+    <h3 id="section-.">Design tools have multiplicative complexity</h3>
     <p>
       My colleague Rudi <a href="https://digitalfreepen.com/2018/09/29/figma-design-tools.html#:~:text=I%20can%20tell.-,Multiplicative%20complexity,-Back%20to%20how">pointed this out a while back</a>. Basically, when you're designing a set
       of primitives that all go in the same space (the canvas) which people are going to combine with each other to make things, everything needs to work with everything else.
@@ -165,8 +195,8 @@
       We only have two types of objects and a handful of operations and info panels, yet we already need to consider how resizing can behave differently given different object types, or how the right-hand panel might behave differently given heterogeneous selections. Some of these questions are more product-related (how resizing a selection of multiple objects should behave), while others 
       are more engineering-related (how we might efficiently handle reflowing large amounts of text). And this is all before we throw in multiplayer, auto-layout, and components!
     </p>
-    <h2>What non-technical things did I learn at Figma?</h2>
-    <h3>Crucial re-architectures</h3>
+    <h2 id="section-">What non-technical things did I learn at Figma?</h2>
+    <h3 id="section-.">Crucial re-architectures</h3>
     <p>
       I joined Figma at a unique time in the codebase's health where - a few years after the initial launch and the team building as fast as possible - the business was beginning to really take off but the accumulated tech debt was on the verge of 
       catching up to us.
@@ -205,7 +235,7 @@
       instead, in the early days it was optimal for us to go through these cycles of building fast and taking on debt, then attempt refactors as needed, because we were racing to stay ahead of 
       our competitors in a fast-moving space.
     </p>
-    <h3>The Mythical Stakeholder Alignment</h3>
+    <h3 id="section-.">The Mythical Stakeholder Alignment</h3>
     <p>
       I spent my first couple years as a product engineer. I was not a very good product engineer.
     </p>
@@ -232,7 +262,7 @@
       person's head, I had enough of an understanding of the system being optimized to know when an idea (that someone else came up with!) was locally possible, and of the product and org (the connected 
       surfaces and the folks who understood them) to know or find out if it was globally possible, too.
     </p>
-    <h3>Figma's engineering culture</h3>
+    <h3 id="section-.">Figma's engineering culture</h3>
     <p>
       <b>Importance of side projects</b>. At Figma, we had a culture that encouraged side projects - toys or programs that folks would create which nobody asked them to, which did not necessarily have an impact
       on the bottom line, but which could be used to explore new ideas or technologies. Many features and innovations came out of side projects. Just off the top of my head:
@@ -377,6 +407,27 @@
     document.addEventListener("DOMContentLoaded", function() {
       renderMathInElement(document.body);
     });
+    const toc = document.getElementById("toc");
+    const sections = document.querySelectorAll(`[id^=section-]`);
+    for (let section of sections) {
+      const h = section.tagName;
+      const title = section.textContent;
+      const id = section.id;
+      const a = document.createElement("a");
+      a.href = `#${id}`;
+      a.textContent = title;
+      const li = document.createElement("li");
+      li.classList.add(`toc-${h}`);
+      for (let i = 0; i < id.length; i++) {
+          if (id[i] === ".") {
+              const tab = document.createElement("span");
+              tab.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+              li.appendChild(tab);
+          }
+      }
+      li.appendChild(a);
+      toc.appendChild(li);
+    }
   </script>
 </article>
 
