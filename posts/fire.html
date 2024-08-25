@@ -43,8 +43,34 @@
         font-size: 15px;
         line-height: 1.3em;
       }
-      .caption > li {
-        margin-bottom: 12px;
+      #toc {
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: scroll;
+        line-height: 0.3em;
+        width: calc(984px - 648px);
+      }
+      @media (min-width: 1280px) {
+        #toc {
+          margin-right: 72px;
+          position: sticky; 
+          top: 72px;
+          z-index: 2;
+        }
+        #trex-noise-schedule-container { 
+          white-space: nowrap;
+        }
+        #trex-noise-schedule-gutter { 
+          margin-right:calc((100vw - 984px) / 2); 
+          z-index: 10 
+        }
+      }
+      #toc > li {
+        list-style-type: none;
+      }
+      .l-gutter {
+        position: relative;
+        background-color: white;
       }
     </style>
   </head>
@@ -58,6 +84,7 @@
   
   
   <dt-article>
+    <div class="l-gutter caption" id="toc"><h4>Contents</h4></div>
     <h1>Simulating Fluids, Fire, and Smoke in Real-Time</h1>
     <h2>Notes on the math, algorithms, and methods involved in simulating fluids like fire and smoke in real-time.</h2>
     <dt-byline></dt-byline>
@@ -85,13 +112,13 @@
       background in vector calculus and differential equations (know how to take the gradient of a vector). Demos are implemented with WebGL.
     </p>
     <dt-byline></dt-byline>
-    <h2>1. Fluid Simulation</h2>
+    <h2 id="section-1">1. Fluid Simulation</h2>
     <p>
       Before we simulate fire, we need to simulate fluid. We assume
       our fluid is <a href="https://en.wikipedia.org/wiki/Incompressible_flow">incompressible</a> and
       <a href="https://en.wikipedia.org/wiki/Inviscid_flow">inviscid</a>, which will vastly simplify our problem.
     </p>
-    <h3>1.1 Basic Fluid Dynamics</h3>
+    <h3 id="section-1.1">1.1 Basic Fluid Dynamics</h3>
     <p>
       Suppose \(D\) is a region in space filled with a fluid. At any point \( \mathbf{x} \in D \) and time \(t\), the fluid has velocity \(\mathbf{u}(\mathbf{x}, t)\).
       Computationally, we can represent the 2D velocity field \( \mathbf{u} \) with an \( N \times N \) grid, where the equally spaced grid points give the value of
@@ -231,15 +258,15 @@
     </p>
     <!-- <dt-code block language="glsl"> -->
       <pre class="l-middle">        <code class="language-glsl">
-          global Vec2Field u;
-          global FloatField density;
-          global float dt;
+global Vec2Field u;
+global FloatField density;
+global float dt;
 
-          // Run for each point in our scalar grid that we want to update
-          float advectPoint(vec2 x) {
-            vec2 coord = x - dt * getVec2At(u, x);
-            return getFloatAt(density, coord);
-          }
+// Run for each point in our scalar grid that we want to update
+float advectPoint(vec2 x) {
+  vec2 coord = x - dt * getVec2At(u, x);
+  return getFloatAt(density, coord);
+}
         </code>
       </pre>
     <!-- </dt-code> -->
@@ -272,7 +299,7 @@
       <em>Click anywhere above to drop some dye in the flow</em>
     </p>
     <dt-byline></dt-byline>
-    <h3>1.2 The Navier-Stokes Equations</h3>
+    <h3 id="section-1.2">1.2 The Navier-Stokes Equations</h3>
     <p>
       So far we've found a model that describes how scalar properties of a fluid evolve over time, assuming the flow is fixed. What about the fluid flow itself -
       how does the velocity field \( \mathbf{u} \) affect itself over time?
@@ -315,20 +342,20 @@
 
       <!-- <dt-code block language="javascript"> -->
         </p><pre class="l-middle">          <code class="language-javascript">
-          let u = createVectorGrid();
-          let density = createScalarGrid();
-          let p = createScalarGrid();
+let u = createVectorGrid();
+let density = createScalarGrid();
+let p = createScalarGrid();
 
-          while (true) {
-            // Solve for the next velocity field.
-            u = advect(u, u);
+while (true) {
+  // Solve for the next velocity field.
+  u = advect(u, u);
 
-            p = computePressure(...);
-            u = u - gradient(p);
+  p = computePressure(...);
+  u = u - gradient(p);
 
-            // Advect dye through the new velocity field.
-            density = advect(u, density);
-          }
+  // Advect dye through the new velocity field.
+  density = advect(u, density);
+}
           </code>
         </pre>
         <!-- </dt-code> -->
@@ -440,19 +467,19 @@
     </p>
     <!-- <dt-code block language="glsl"> -->
       <pre class="l-middle">        <code class="language-glsl">
-          global FloatField divergence;
-          global FloatField pressure;
-          global float texelSize;
+global FloatField divergence;
+global FloatField pressure;
+global float texelSize;
 
-          // Run for each point in our pressure grid that we want to update
-          float iterateJacobi(vec2 x) {
-            float div = getFloatAt(divergence, x);
-            float L = getFloatAt(pressure, x + vec2(-texelSize, 0.));
-            float R = getFloatAt(pressure, x + vec2(texelSize, 0.));
-            float T = getFloatAt(pressure, x + vec2(0., texelSize));
-            float B = getFloatAt(pressure, x + vec2(0., -texelSize));
-            return (div - L - R - T - B) / -4.;
-          }
+// Run for each point in our pressure grid that we want to update
+float iterateJacobi(vec2 x) {
+  float div = getFloatAt(divergence, x);
+  float L = getFloatAt(pressure, x + vec2(-texelSize, 0.));
+  float R = getFloatAt(pressure, x + vec2(texelSize, 0.));
+  float T = getFloatAt(pressure, x + vec2(0., texelSize));
+  float B = getFloatAt(pressure, x + vec2(0., -texelSize));
+  return (div - L - R - T - B) / -4.;
+}
         </code>
       </pre>
     <!-- </dt-code> -->
@@ -471,32 +498,32 @@
 
       <!-- <dt-code block language="javascript"> -->
       </p><pre class="l-middle">        <code class="language-javascript">
-        let u = createVectorGrid();
-        let density = createScalarGrid();
-        let div = createScalarGrid();
-        let p = createScalarGrid();
+let u = createVectorGrid();
+let density = createScalarGrid();
+let div = createScalarGrid();
+let p = createScalarGrid();
 
-        while (true) {
-          // Solve for the next velocity field.
-          u = advect(u, u);
+while (true) {
+  // Solve for the next velocity field.
+  u = advect(u, u);
 
-          // Enforce incompressibility with pressure projection.
-          div = divergence(u);
-          for (let i = 0; i &lt; JACOBI_ITERATIONS; i++) {
-            p = updatePressure(p, div);
-          }
-          u = u - gradient(p);
+  // Enforce incompressibility with pressure projection.
+  div = divergence(u);
+  for (let i = 0; i &lt; JACOBI_ITERATIONS; i++) {
+    p = updatePressure(p, div);
+  }
+  u = u - gradient(p);
 
-          // Advect dye through the new velocity field.
-          density = advect(u, density);
-        }
+  // Advect dye through the new velocity field.
+  density = advect(u, density);
+}
         </code>
       </pre>
       <!-- </dt-code> -->
 
     <p></p>
     <dt-byline></dt-byline>
-    <h3>1.3 Vorticity Confinement</h3>
+    <h3 id="section-1.3">1.3 Vorticity Confinement</h3>
     <p>
       Using a grid to store our velocity field is extremely convenient, but it results in unwanted
       numerical smoothing whenever we have to interpolate values between grid points.
@@ -558,33 +585,33 @@
     </p>
     <!-- <dt-code block language="glsl"> -->
       <pre class="l-middle">        <code class="language-glsl">
-          global Vec2Field u;
-          global float texelSize;
+global Vec2Field u;
+global float texelSize;
 
-          // Run to get curl for each point in grid
-          float computeCurl(vec2 x) {
-            float L = getVec2At(u, x + vec2(-texelSize, 0.)).y;
-            float R = getVec2At(u, x + vec2(texelSize, 0.)).y;
-            float T = getVec2At(u, x + vec2(0., texelSize)).x;
-            float B = getVec2At(u, x + vec2(0., -texelSize)).x;
-            return (R - L) - (T - B);
-          }
+// Run to get curl for each point in grid
+float computeCurl(vec2 x) {
+  float L = getVec2At(u, x + vec2(-texelSize, 0.)).y;
+  float R = getVec2At(u, x + vec2(texelSize, 0.)).y;
+  float T = getVec2At(u, x + vec2(0., texelSize)).x;
+  float B = getVec2At(u, x + vec2(0., -texelSize)).x;
+  return (R - L) - (T - B);
+}
 
-          global Vec2Field curl;
-          global float confinement;
+global Vec2Field curl;
+global float confinement;
 
-          // Run to get confinement force for each point in grid
-          vec2 confinementForce(vec2 x) {
-            float L = getFloatAt(curl, x + vec2(-texelSize, 0.));
-            float R = getFloatAt(curl, x + vec2(texelSize, 0.));
-            float T = getFloatAt(curl, x + vec2(0., texelSize));
-            float B = getFloatAt(curl, x + vec2(0., -texelSize));
-            float C = getFloatAt(curl, x);
+// Run to get confinement force for each point in grid
+vec2 confinementForce(vec2 x) {
+  float L = getFloatAt(curl, x + vec2(-texelSize, 0.));
+  float R = getFloatAt(curl, x + vec2(texelSize, 0.));
+  float T = getFloatAt(curl, x + vec2(0., texelSize));
+  float B = getFloatAt(curl, x + vec2(0., -texelSize));
+  float C = getFloatAt(curl, x);
 
-            vec2 N = vec2(abs(T) - abs(B), abs(R) - abs(L));
-            N = N / length(N);
-            return confinement * C;
-          }
+  vec2 N = vec2(abs(T) - abs(B), abs(R) - abs(L));
+  N = N / length(N);
+  return confinement * C;
+}
         </code>
       </pre>
     <!-- </dt-code> -->
@@ -592,30 +619,30 @@
       The full simulation with turbulence:
       <!-- <dt-code block language="javascript"> -->
         </p><pre class="l-middle">          <code class="language-javascript">
-          let u = createVectorGrid();
-          let density = createScalarGrid();
-          let div = createScalarGrid();
-          let p = createScalarGrid();
-          let curl = createVectorGrid();
+let u = createVectorGrid();
+let density = createScalarGrid();
+let div = createScalarGrid();
+let p = createScalarGrid();
+let curl = createVectorGrid();
 
-          while (true) {
-            // Solve for the next velocity field.
-            u = advect(u, u);
+while (true) {
+  // Solve for the next velocity field.
+  u = advect(u, u);
 
-            // Use vorticity confinement to amplify turbulence of velocity field.
-            curl = computeCurl(u);
-            u = u + confinementForce(curl, CONFINEMENT);
+  // Use vorticity confinement to amplify turbulence of velocity field.
+  curl = computeCurl(u);
+  u = u + confinementForce(curl, CONFINEMENT);
 
-            // Enforce incompressibility with pressure projection.
-            div = divergence(u);
-            for (let i = 0; i &lt; JACOBI_ITERATIONS; i++) {
-              p = updatePressure(p, div);
-            }
-            u = u - gradient(p);
+  // Enforce incompressibility with pressure projection.
+  div = divergence(u);
+  for (let i = 0; i &lt; JACOBI_ITERATIONS; i++) {
+    p = updatePressure(p, div);
+  }
+  u = u - gradient(p);
 
-            // Advect dye through the new velocity field.
-            density = advect(u, density);
-          }
+  // Advect dye through the new velocity field.
+  density = advect(u, density);
+}
           </code>
         </pre>
       <!-- </dt-code> -->
@@ -641,7 +668,7 @@
       and in practice the curl noise field \( \bm{\phi} \) both evolves with time and is also advected by the fluid flow.
     </p>
     <dt-byline></dt-byline>
-    <h2>2. Fire Simulation</h2>
+    <h2 id="section-2">2. Fire Simulation</h2>
     <p>
       If you've gotten this far, pat yourself on the back! The methods in the previous section let us efficiently
       and accurately simulate fluids with varying physical parameters (oil, water, honey)
@@ -658,7 +685,7 @@
       of our fluid rise with a thermal buoyancy model, and finally, we'll need to render our flames correctly, taking into account
       blackbody radiation of the flames, human perception of light, and fire movement.
     </p>
-    <h3>2.1 A Basic Combustion Model</h3>
+    <h3 id="section-2.1">2.1 A Basic Combustion Model</h3>
     <p>
       Chemically, fire is caused by the oxidation of a fuel material in a reaction that releases both heat and light.
       In our case, we can assume that any fuel in our system has already ignited and is actively adding heat; we won't worry
@@ -700,7 +727,7 @@
       \rho^\prime = \rho (1 - \gamma_{fuel})^{\Delta t}
       $$
     </p>
-    <h3>2.2 Thermal Buoyancy</h3>
+    <h3 id="section-2.2">2.2 Thermal Buoyancy</h3>
     <p>
       So far, our temperature field doesn't do anything to our fluid flow. But it should - hot pockets of air should expand and rise, and cooler pockets should fall.
       We can model this with a thermal buoyancy force. Since we're assuming incompressibility, we won't actually handle air expansion, but the fluid flow
@@ -737,45 +764,45 @@
       The simulation code builds off the basic fluid routines:
       <!-- <dt-code block language="javascript"> -->
         </p><pre class="l-middle">          <code class="language-javascript">
-          let u = createVectorGrid();
-          let density = createScalarGrid();
-          let div = createScalarGrid();
-          let p = createScalarGrid();
-          let curl = createVectorGrid();
-          let fuel = createScalarGrid();
-          let temp = createScalarGrid();
+let u = createVectorGrid();
+let density = createScalarGrid();
+let div = createScalarGrid();
+let p = createScalarGrid();
+let curl = createVectorGrid();
+let fuel = createScalarGrid();
+let temp = createScalarGrid();
 
-          while (true) {
-            // Solve for the next velocity field.
-            u = advect(u, u);
+while (true) {
+  // Solve for the next velocity field.
+  u = advect(u, u);
 
-            // Combustion step.
-            temp = combust(temp, fuel);
+  // Combustion step.
+  temp = combust(temp, fuel);
 
-            // Use vorticity confinement to amplify turbulence of velocity field.
-            curl = computeCurl(u);
-            u = u + confineVorticity(curl, CONFINEMENT);
+  // Use vorticity confinement to amplify turbulence of velocity field.
+  curl = computeCurl(u);
+  u = u + confineVorticity(curl, CONFINEMENT);
 
-            // Add thermal buoyancy.
-            u = u + buoyancy(temp);
+  // Add thermal buoyancy.
+  u = u + buoyancy(temp);
 
-            // Enforce incompressibility with pressure projection.
-            div = divergence(u);
-            for (let i = 0; i &lt; JACOBI_ITERATIONS; i++) {
-              p = updatePressure(p, div);
-            }
-            u = u - gradient(p);
+  // Enforce incompressibility with pressure projection.
+  div = divergence(u);
+  for (let i = 0; i &lt; JACOBI_ITERATIONS; i++) {
+    p = updatePressure(p, div);
+  }
+  u = u - gradient(p);
 
-            // Advect density, fuel, and temperature through the new velocity field.
-            density = advect(u, density);
-            temp = advect(u, temp);
-            fuel = advect(u, fuel);
-          }
+  // Advect density, fuel, and temperature through the new velocity field.
+  density = advect(u, density);
+  temp = advect(u, temp);
+  fuel = advect(u, fuel);
+}
           </code>
         </pre>
       <!-- </dt-code> -->
     <p></p>
-    <h3>2.3 Fire Rendering</h3>
+    <h3 id="section-2.3">2.3 Fire Rendering</h3>
     <p>
       Fire is a <a href="http://old.cescg.org/CESCG-2000/SMaierhofer/node6.html">participating medium</a>,
       meaning it emits light through blackbody radiation<dt-fn>Besides emitting its own blackbody radiation, fire also scatters light that passes through it. For more, see
@@ -944,9 +971,30 @@
   </script>
   <script defer="" src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
   <script>
-      document.addEventListener("DOMContentLoaded", function() {
-          renderMathInElement(document.body);
-      });
+    document.addEventListener("DOMContentLoaded", function() {
+      renderMathInElement(document.body);
+    });
+    const toc = document.getElementById("toc");
+    const sections = document.querySelectorAll(`[id^=section-]`);
+    for (let section of sections) {
+      const h = section.tagName;
+      const title = section.textContent;
+      const id = section.id;
+      const a = document.createElement("a");
+      a.href = `#${id}`;
+      a.textContent = title;
+      const li = document.createElement("li");
+      li.classList.add(`toc-${h}`);
+      for (let i = 0; i < id.length; i++) {
+        if (id[i] === ".") {
+          const tab = document.createElement("span");
+          tab.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+          li.appendChild(tab);
+        }
+      }
+      li.appendChild(a);
+      toc.appendChild(li);
+    }
   </script>
   <script src="./fire-assets/dist.js"></script>
   </article>
