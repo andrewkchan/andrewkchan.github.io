@@ -667,36 +667,36 @@ __device__ inline float blocktranspose(float v, float def) {
   //   this function returns:
   //   - For warp 0, lane K: val_k
   //   - For all other warps and lanes: def
-	int lane = threadIdx.x % warpSize;
-	int warp = threadIdx.x / warpSize;
-
+  int lane = threadIdx.x % warpSize;
+  int warp = threadIdx.x / warpSize;
+  
   // Will hold results of all warps.
-	// Capacity 32 since there can be at most 32 warps in a block.
-	__shared__ float sm[32];
-	if (lane == 0) sm[warp] = v;
-	__syncthreads();
-
-	return lane &lt; blockDim.x / warpSize ? sm[lane] : def;
+  // Capacity 32 since there can be at most 32 warps in a block.
+  __shared__ float sm[32];
+  if (lane == 0) sm[warp] = v;
+  __syncthreads();
+  
+  return lane &lt; blockDim.x / warpSize ? sm[lane] : def;
 }
 
 template &lt;typename T>
 __global__
 void matmul_wide(const T* A, const float* x, int n, int d, float* out) {
-	// A (d,n) @ x (n,) -> out (d,)
-	// PRECOND: Block is 1-D and contains WPB warps.
-	int i = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
-	if (i >= d) return;
-	// Warp j computes sum for row at &lt;blockIdx.x*WPB + j>
+  // A (d,n) @ x (n,) -> out (d,)
+  // PRECOND: Block is 1-D and contains WPB warps.
+  int i = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
+  if (i >= d) return;
+  // Warp j computes sum for row at &lt;blockIdx.x*WPB + j>
   // Lane 0 of each warp will hold result
-	int k = threadIdx.x % warpSize;
-	float rowSum = matmul_row(&A[n * i], x, k, n);
+  int k = threadIdx.x % warpSize;
+  float rowSum = matmul_row(&A[n * i], x, k, n);
   // Transpose values so lane k in warp 0 contains row at &lt;blockIdx.x*WPB + k>
   // For WPB=32, this allows us to coalesce 32 float32 writes into a single 128-byte store
   rowSum = blocktranspose(rowSum, 1.0);
-	if (threadIdx.x &lt; blockDim.x / warpSize) {
+  if (threadIdx.x &lt; blockDim.x / warpSize) {
     int block_start_i = blockIdx.x * blockDim.x / warpSize;
-		out[block_start_i + k] = rowSum;
-	}
+    out[block_start_i + k] = rowSum;
+  }
 }
         </code>
     </pre>
