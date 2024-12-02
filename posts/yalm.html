@@ -1,0 +1,843 @@
+<!DOCTYPE html><html><head>
+  <title>Fast LLM Inference From Scratch</title>
+  <meta charset="utf-8">
+  <!-- Google tag (gtag.js) -->
+  <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
+  <!-- Sentry -->
+  <script src="https://js.sentry-cdn.com/f27e96506d16307fa97dcc9442b50117.min.js" crossorigin="anonymous"></script>
+  <script src="./template.v1.js"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-HYB0C59DXR');
+  </script>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+    <script defer="" src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+
+    <!-- Google tag (gtag.js) -->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-HYB0C59DXR');
+    </script>
+
+    <script type="text/front-matter">
+      title: "Fast LLM Inference From Scratch"
+      published: December 2, 2024
+      description: "Reaching state-of-the-art single-GPU inference throughput without libraries"
+      authors:
+      - Andrew Chan: http://andrewkchan.github.io
+      affiliations:
+      -
+    </script>
+
+    <style>
+      .compact-li li {
+        margin-bottom: 0.5em;
+      }
+      .caption {
+        font-size: 15px;
+        line-height: 1.3em;
+      }
+      .slider {
+          width: 100%;
+      }
+      #trex-forward-container {
+          width: min(90vw, 650px);
+      }
+      #trex-forward-main {
+          white-space: nowrap;
+      }
+      #trex-forward-slider-container {
+          width: 90%;
+          margin: 0 auto;
+      }
+      .trex-forward-carousel {
+          white-space: nowrap;
+      }
+      .trex-forward-carousel-img {
+          display: inline-block;
+          width: 19%;
+          opacity: 0.6;
+      }
+      .trex-forward-carousel-img:hover {
+          cursor: pointer;
+          opacity: 1.0;
+      }
+      #normalizing-flow>#normalizing-flow-gif {
+          display: none;
+      }
+      #normalizing-flow:hover>#normalizing-flow-gif {
+          display: inline-block;
+      }
+      #normalizing-flow:hover>#normalizing-flow-png {
+          display: none;
+      }
+      #toc {
+          line-height: 0.3em;
+          width: calc(984px - 648px);
+      }
+      @media (min-width: 1280px) {
+          #toc {
+              margin-right: 72px;
+              position: sticky; 
+              top: 72px;
+              z-index: 2;
+          }
+          #trex-noise-schedule-container { 
+              white-space: nowrap;
+          }
+          #trex-noise-schedule-gutter { 
+              margin-right:calc((100vw - 984px) / 2); 
+              z-index: 10 
+          }
+      }
+      #toc > li {
+          list-style-type: none;
+      }
+      .l-gutter {
+          position: relative;
+          background-color: white;
+      }
+      #trex-noise-schedule-container {
+          width: min(90vw, 800px);
+      }
+    </style>
+  </head>
+<body>
+  <dt-article>
+    <h1><a href="/" class="hero">Andrew Chan</a></h1>
+  </dt-article>
+  <hr>
+  <article class="toyb-article">
+  
+  
+  
+  <dt-article>
+    <div class="l-gutter caption" id="toc"><h4>Contents</h4></div>
+    <h1>Fast LLM Inference From Scratch</h1>
+    <h2>Reaching state-of-the-art single-GPU inference throughput without libraries</h2>
+    <dt-byline></dt-byline>
+    <p>
+      This post is about building an LLM inference engine using C++ and CUDA from scratch without libraries.
+    </p>
+    <p>
+      Why? In doing so, we can learn about the full stack of LLM inference - which is becoming increasingly important<dt-fn>Especially as inference compute becomes a new axis with which AI models scale,
+      and models are increasingly deployed locally to devices on the edge.</dt-fn> - from CUDA kernels to model architecture, and get a real sense of how different optimizations affect inference speed.
+    </p>
+    <p>
+      Many areas in ML can feel quite inaccessible because they use complicated math. LLMs are not one of those areas, and as we'll see, <i>LLM inference</i> is something that systems programmers 
+      will feel right at home with. At the end of the day, it's about running a program on computers fast, and one of the most important use cases is running fast on a single prompt on consumer 
+      devices. Everyday programmers can - with just average <a href="https://knowyourmeme.com/memes/wordcel-shape-rotator-mathcel">shape rotator</a> skills and no H100 cluster - understand the major concepts here and code something approaching the state of the art. 
+    </p>
+    <p>
+      That's what this post will focus on: building a program that can load weights of common open models and do single-batch inference on them on a single CPU + GPU server, and iteratively 
+      improving the token throughput on our use case until it surpasses <a href="https://github.com/ggerganov/llama.cpp">llama.cpp</a>. Readers should have basic familiarity with large language 
+      models, attention, and transformers.
+    </p>
+    <h3>Acknowledgements</h3>
+    <ul class="compact-li">
+      <li>
+        <a href="https://github.com/zeux/calm">calm</a> - Much of my implementation is inspired by Arseny Kapoulkine's inference engine.
+        In a way, this project was kicked off by “understand calm and what makes it so fast.” I've tried to keep my code more readable for myself though, and as much as possible 
+        scientifically understanding optimizations, which means foregoing some advanced techniques used in calm like dynamic parallelism.
+      </li>
+      <li>
+        <a href="https://github.com/karpathy/llama2.c">llama2.c</a> - Parts of the CPU backend come from Andrej Karpathy's excellent C implementation of Llama inference.
+      </li>
+    </ul>
+    <dt-byline></dt-byline>
+    <h1 id="section-1">1. Recap: LLM architectures and inference</h1>
+    <p>
+      Let's recap how LLMs work, starting with their architecture and then moving onto inference mechanics. This will provide a starting point for an optimized implementation and help us establish benchmarks.
+    </p>
+    <p>
+      Almost every major open-weights LLM uses the same architecture (sequential transformer blocks), with some minor variations/innovations since GPT-2:
+      </p><ul class="compact-li">
+        <li><a href="https://arxiv.org/abs/2305.13245v3">Grouped query attention (and multi-query attention)</a></li>
+        <li><a href="https://arxiv.org/abs/2401.04088">Mixture-of-experts-based feedforward networks</a></li>
+        <li><a href="https://arxiv.org/abs/2002.05202">GLU-based instead of MLP-based feedforward networks</a></li>
+        <li>Different activation functions for feedforward networks</li>
+        <li>Different layer normalizations</li>
+        <li>Rotary position embeddings</li>
+      </ul>
+    <p></p>
+    <p>
+      Loading models from different architectures is thus essentially defining a customizable transformer block class, then creating a sequence of these configured with the 
+      right bells and whistles and initializing them with the <a href="https://huggingface.co/docs/safetensors/en/index">safetensors</a> weights. This article will focus on just 
+      one architecture - Mistral v0.2 - but if you're curious you can read 
+      <a href="https://github.com/ggerganov/llama.cpp/blob/master/docs/development/HOWTO-add-model.md">how llama.cpp adds support for new models</a>.
+    </p>
+    <p>
+      At a high level, inference looks like the C++ pseudocode below:
+    </p>
+    <!-- <dt-code block language="clike"> -->
+      <pre class="l-middle">        <code class="language-clike">
+/* PSUEDOCODE */
+
+void generate(Model&amp; model, std::string prompt, int steps) {
+  std::vector&lt;int&gt; encoded = tokenizer.encode(prompt);
+  InferenceState s(model);
+  
+  // 1. Prefill step: Forward the model on each prompt token, discarding 
+  // the output. This lets the model read the prompt and hydrates the KV 
+  // cache.
+  for (int token : encoded) {
+    model.forward(s, token);
+  }
+  // 2. Decode step: Forward the model repeatedly, generating 1 token at a time.
+  for (int i = 0; i &lt; steps; i++) {
+    model.forward(s, encoded.back());
+    int next_token = sampler.sample(s.logits);
+    encoded.push_back(next_token);
+    std::cout &lt;&lt; tokenizer.decode_one(next_token) &lt;&lt; std::flush;
+    if (next_token == tokenizer.EOS) {
+      break;
+    }
+  }
+}
+        </code>
+    </pre>
+  <!-- </dt-code> -->
+    <dt-byline></dt-byline>
+    <p>
+      We can start to see differences between training and inference immediately. Inference - at least the local kind that we care about - is usually single batch. 
+      For prompt completion and use cases like generating essays, the “decode phase” takes up the majority of execution and involves computing attention between the past context 
+      and just a single token (or query timestep). 
+    </p>
+    <p>
+      The prefill step is more similar to training in that we're given a complete sequence to attend over, but more on that later. In chatbots there's also an “append” step when 
+      passing the model additional user messages which is like prefill, but I won't talk about that in this article as our implementation will support only completions. 
+    </p>
+    <p>
+      The model forward pass looks like so:
+    </p>
+    <!-- <dt-code block language="clike"> -->
+      <pre class="l-middle">        <code class="language-clike">
+/* PSUEDOCODE */
+
+// InferenceState is the minimum set of buffers needed to
+// hold state during the forward pass and exists to avoid
+// extra allocations
+void Model::forward(InferenceState&amp; s, int token) {
+	// The embedding table maps token IDs to embedding vectors,
+	// which are copied into a buffer of the inference state
+	s.x = copy_embedding(token, this-&gt;token_embedding_table);
+	
+	// Models consist of a sequence of transformer blocks which
+	// mutate the inference state in order
+	for (Block&amp; b : this-&gt;blocks) {
+		b-&gt;block(s);
+	}
+	
+	// Usually there is a layer norm right before the final classifier
+	s.x = layernorm(s.x, this-&gt;lm_head_prenorm_weights);
+	// Typically we end with a linear transform from (dim) -&gt; (vocab_size)
+	s.logits = linear(s.x, this-&gt;lm_head_classifier_weights); 
+}
+
+void Block::block(InferenceState&amp; s) {
+	s.x_resid = layernorm(s.x, this-&gt;att_prenorm_weights);
+	// Multi-head attention typically includes: 
+	// 1. RoPE on input (element-wise mutation w/ sines/cosines)
+	// 2. QKV matmuls and updating the KV cache
+	// 3. Causal self-attention, softmax, and value mixing
+	// 4. Projection back into the residual stream
+	s.x_resid = multi_head_attn(
+		s.x_resid,
+		this-&gt;wq, 
+		this-&gt;wk, 
+		this-&gt;wv, 
+		this-&gt;key_cache,
+		this-&gt;value_cache
+	);
+	s.x += s.x_resid;
+	s.x_resid = layernorm(s.x, this-&gt;ffn_prenorm_weights);
+	// On modern architectures like Llama, this is a GLU feedforward 
+	// with 3 linear transforms, not a simple MLP:
+	// -&gt; w2(F.silu(w1(x)) * w3(x))
+	// Some architectures also split the FFN into a mixture of experts.
+	s.x_resid = ffn(s.x_resid, this-&gt;w1, this-&gt;w2, this-&gt;w3);
+	s.x += s.x_resid;
+}
+        </code>
+    </pre>
+  <!-- </dt-code> -->
+    <p>
+      This should look roughly familiar, if expressed a bit more low-level in typical C++ fashion. 
+    </p>
+    <p>
+      The main thing worth noting is that unlike training, inference can use a KV cache to store past keys and values for each block. 
+      We keep things simple and implement this as a simple ring buffer (known as sliding window attention in the literature), which is sufficient to 
+      support exact attention up to some maximum context length. Some exact attention implementations like PagedAttention use more complex KV caches to 
+      improve aspects like memory footprint.
+    </p>
+    <p>
+      Now we are ready to discuss bottlenecks and benchmarks. First, a fact: inference is memory-bandwidth-bound on modern hardware. For more, see 
+      this <a href="https://zeux.io/2024/03/15/llm-inference-sol">excellent blog post</a> by Arseny Kapoulkine, but the gist of it is:
+      </p><ul class="compact-li">
+        <li>
+          Every time we generate a token we need to read the entire model, performing only a few floating point operations per weight.
+        </li>
+        <li>
+          And modern CPUs and GPUs are <i>extremely</i> fast at floating point operations. The key metric is the FLOPs/s-to-memory-bandwidth-ratio (FLOPs/byte). 
+          For instance, the AMD Ryzen 7950X has about a 40:1 ratio, while the RTX 4090 has an 82:1 ratio. The AMD EPYC 7702P on my server has a less impressive, 
+          but still significant 10:1 ratio.
+        </li>
+      </ul>
+    <p></p>
+    <p>
+      This is why <a href="https://huggingface.co/docs/optimum/en/concept_guides/quantization">model quantization</a> is so effective at improving inference speed. 
+      It's not just allowing the hardware to use faster instructions (which is sometimes true), 
+      but also shrinking the input that we need to fit through the bandwidth bottleneck.
+    </p>
+    <p>
+      We can use bandwidth to establish a theoretical “speed of light”, or the max token throughput we can achieve. On my machine with an AMD EPYC 7702P and RTX 4090:
+      </p><ul class="compact-li">
+        <li>
+          EPYC 7702P max bandwidth<dt-fn><a href="https://www.amd.com/content/dam/amd/en/documents/products/epyc/amd-epyc-7002-series-datasheet.pdf">See the official datasheet</a>.</dt-fn>: 204.8 GB/s
+        </li>
+        <li>
+          RTX 4090 max bandwidth<dt-fn>See <a href="https://en.wikipedia.org/wiki/GeForce_40_series#Desktop">wikipedia</a>.</dt-fn>: 1008 GB/s
+        </li>
+        <li>
+          <p>
+            Mistral-7B-Instruct-v0.2-FP16 with a 4096-length context window and FP32 KV-cache is 15557746688 bytes
+          </p>
+          <ul class="compact-li">
+            <li>
+              204.8e9 bytes/s / 15557746688 bytes/tok = ~13.2 tok/s for EPYC 7702P
+            </li>
+            <li>
+              1008e9 bytes/s / 15557746688 bytes/tok = ~64.8 tok/s for RTX 4090
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p>
+            Mistral-7B-Instruct-v0.2-FP32 with a 4096-length context window and FP32 KV-cache is 29516398592 bytes
+          </p>
+          <ul class="compact-li">
+            <li>
+              204.8e9 bytes/s / 29516398592 bytes/tok = ~6.9 tok/s for EPYC 7702P
+            </li>
+            <li>
+              This won't fit in the 21GB of RTX 4090 VRAM so we'll skip it.
+            </li>
+          </ul>
+        </li>
+      </ul>
+    <p></p>
+    <p>
+      Note that how close we can actually come to the theoretical bounds varies a bit depending on the hardware. We fortunately have a few state-of-the-art inference 
+      engines that we can look at to set more realistic targets. On my machine<dt-fn>Unfortunately I wasn't able to test calm CPU as my machine doesn't support the extensions 
+      needed for it to compile.</dt-fn> using Mistral-7B-Instruct-v0.2 in FP16 I'm able to get:
+    </p>
+    <table>
+      <tbody><tr>
+        <th>Program</th>
+        <th>Throughput</th>
+      </tr>
+      <tr>
+        <td>llama.cpp, CPU</td>
+        <td>8.7 tok/s (after tuning number of threads)</td>
+      </tr>
+      <tr>
+        <td>huggingface transformers, GPU</td>
+        <td>34.2 tok/s</td>
+      </tr>
+      <tr>
+        <td>llama.cpp, GPU</td>
+        <td>55.08 tok/s</td>
+      </tr>
+      <tr>
+        <td>calm, GPU</td>
+        <td>57.6 tok/s</td>
+      </tr>
+    </tbody></table>
+
+    <h1 id="section-2">2. Inference on the CPU</h1>
+    <p>
+      We begin with a naive implementation on CPU (the code is available <a href="https://github.com/andrewkchan/yalm/blob/ec8c8fec911794c788c50dfe5d42ae9e1ef0e905/src/infer.cpp#L240">here</a>). 
+      It's a straightforward single-threaded implementation with a 4096-length KV cache that only supports FP32 weights and no explicit SIMD of any kind. It achieves a blazing fast 
+      throughput of 0.6 tok/s. Here's what that looks like:
+    </p>
+    <div class="l-middle">
+      <video controls="" src="./yalm-assets/cpu-naive.mov" style="width: min(90vw, 500px)"></video>
+    </div>
+    <p>
+      The first optimization step we can do is to begin parallelizing our code on the thread level. Equipped with our handy OpenMP pragmas, we go hunting for embarrassingly parallel 
+      opportunities. We'll optimize the same spots as llama2.c, and I'll go over each one to show the improvement.
+    </p>
+    <p>
+      First, <a href="https://github.com/andrewkchan/yalm/commit/2a65dcbdff106976aeff1f08a037c6b6ece5b80b">adding a single line of code</a> parallelizes our widely matrix-vector multiplication 
+      function so that each thread handles a row of the output. This is a big improvement that takes us to 4.2 tok/s with a bit of tuning to find the right number of threads:
+    </p>
+    <div class="l-middle">
+      <video controls="" src="./yalm-assets/cpu-openmp-mm.mov" style="width: min(90vw, 500px)"></video>
+    </div>
+    <p>
+      Next, we can parallelize our multi-head attention computation so that each thread gets an attention head to compute. This is a less significant improvement, but gets us to 
+      4.4 tok/s.
+    </p>
+    <div class="l-middle">
+      <video controls="" src="./yalm-assets/cpu-openmp-mha.mov" style="width: min(90vw, 500px)"></video>
+    </div>
+    <p>
+      The next potential opportunity is to use SIMD. The EPYC 7702P CPU supports AVX and AVX2, which let us work with 256-bit vectors of 8 packed float32 values at a time. 
+      In our ubiquitous <code>matmul</code> function, we could try loading, multiplying, and accumulating 8 values at a time in the inner loop, which would let each thread finish 
+      its row-column dot product up to 8 times faster!
+    </p>
+    <p>
+      Unfortunately, inspecting our compiled code via <code>objdump</code> reveals that <code>matmul</code> is in fact already using AVX instructions (notice <code>vmovups</code>) to perform a vectorized dot 
+      product in the case that the inputs are large enough. It seems GCC is too smart:
+    </p>
+    <!-- <dt-code block language="plaintext"> -->
+      <pre class="l-middle">        <code class="language-plaintext">
+1f5:       c4 e3 7d 19 c1 01       vextractf128 xmm1,ymm0,0x1
+1fb:       c5 f0 58 c0             vaddps xmm0,xmm1,xmm0
+1ff:       c5 f8 12 c8             vmovhlps xmm1,xmm0,xmm0
+203:       c5 f0 58 c8             vaddps xmm1,xmm1,xmm0
+207:       c5 f0 c6 c1 55          vshufps xmm0,xmm1,xmm1,0x55
+20c:       c5 f8 58 c1             vaddps xmm0,xmm0,xmm1
+        </code>
+    </pre>
+  <!-- </dt-code> -->
+    <p>
+      Let's turn to quantization. We won't explore the full gamut of quantized formats, since the goal of this article is to explore the breadth of optimizations, and we've 
+      chosen our benchmarks with fixed formats. Instead, we'll just quantize our weights to FP16, which is the bare minimum needed to get it loaded onto the RTX 4090 VRAM anyway.
+    </p>
+    <p>
+      One hiccup is that many CPUs do not support native float16 math. But barring that, we'd like to keep our calculations in float32 as much as possible anyway to mitigate 
+      effects on accuracy, and we should be able to without trading off performance as long as bandwidth remains a bottleneck. 
+    </p>
+    <p>
+      So instead we leverage the fact that many CPUs do still support converting float16 values to float32 via the F16C x86 extension (which has been well-supported for over a 
+      decade now) to load float16 weights and convert them to float32 just-in-time for calculations. Among other things, this requires us to explicitly vectorize the loads in 
+      our matmul function from before because GCC doesn't know how to handle the half-precision arrays.
+    </p>
+    <p>
+      The resulting implementation does not yield any difference in perplexity for short texts. It's also nearly twice as fast at 8.2-8.4 tok/s:
+    </p>
+    <div class="l-middle">
+      <video controls="" src="./yalm-assets/cpu-f16c.mov" style="width: min(90vw, 500px)"></video>
+    </div>
+
+    <dt-byline></dt-byline>
+
+    <h1 id="section-3">3. Inference on the GPU</h1>
+    <br>
+    <p>
+      Having quantized our model to half its size, we can now load it onto our RTX 4090. We can now begin a GPU inference implementation. 
+      Remember our rules: raw C++/CUDA only, no CUTLASS, cuBLAS, cuDNN, or other libraries.
+    </p>
+    <p>
+      A first, naive implementation attempts to translate our CPU operations 1-1 to kernels, with some extra kernels for things like vector additions. 
+      So we end up with a fairly long list of kernels, but more importantly, host C++ code in our GPU backend which looks almost like our CPU backend, 
+      but with the “dispatch kernel” triple-chevrons <code>&lt;&lt;&lt; . &gt;&gt;&gt;</code> attached to the function calls. For instance, here's the half of our block forward pass 
+      in our GPU backend where we pass the activations through a feedforward network before adding back as residuals:
+    </p>
+    <!-- <dt-code block language="clike"> -->
+      <pre class="l-middle">        <code class="language-clike">
+// mix self.w2(F.silu(self.w1(x)) * self.w3(x))
+// Note this is a feedforward with a GLU, not a simple MLP.
+matmul&lt;&lt;&lt;c.hidden_dim, WARP_SIZE&gt;&gt;&gt;(
+	w1<float>(), s.xb(), c.dim, c.hidden_dim, s.hb()
+);
+matmul&lt;&lt;&lt;c.hidden_dim, WARP_SIZE&gt;&gt;&gt;(
+	w3<float>(), s.xb(), c.dim, c.hidden_dim, s.hb2()
+);
+glu_gelu&lt;&lt;&lt;
+  (c.hidden_dim + MAX_THREADS_PER_BLOCK - 1)/MAX_THREADS_PER_BLOCK, 
+  MAX_THREADS_PER_BLOCK,
+&gt;&gt;&gt;(
+	s.hb(), s.hb2(), s.hb()
+);
+matmul&lt;&lt;&lt;c.dim, WARP_SIZE&gt;&gt;&gt;(
+	w2<float>(), s.hb(), c.hidden_dim, c.dim, s.xb2()
+);
+// ffn residual back into x
+add_residuals&lt;&lt;&lt;
+	(c.dim + MAX_THREADS_PER_BLOCK - 1)/MAX_THREADS_PER_BLOCK,
+	MAX_THREADS_PER_BLOCK
+&gt;&gt;&gt;(
+	s.x(), s.xb2(), c.dim, s.x()
+);
+        </float></float></float></code>
+    </pre>
+  <!-- </dt-code> -->
+    <p>
+      And the corresponding CPU code:
+    </p>
+    <!-- <dt-code block language="clike"> -->
+      <pre class="l-middle">        <code class="language-clike">
+// mix self.w2(F.silu(self.w1(x)) * self.w3(x))
+// Note this is a feedforward with a GLU, not a simple MLP.
+matmul(s.hb(), s.xb(), w1&lt;T&gt;(), c.dim, c.hidden_dim);
+matmul(s.hb2(), s.xb(), w3&lt;T&gt;(), c.dim, c.hidden_dim);
+for (int i = 0; i &lt; c.hidden_dim; ++i) {
+  s.hb()[i] = gelu(s.hb()[i]) * s.hb2()[i];
+}
+matmul(s.xb2(), s.hb(), w2&lt;T&gt;(), c.hidden_dim, c.dim);
+// residual connection back into x
+for (int i = 0; i &lt; c.dim; ++i) {
+  s.x()[i] += s.xb2()[i];
+}
+        </code>
+    </pre>
+  <!-- </dt-code> -->
+    <p>
+      This works because even though CUDA kernels are executed asynchronously, kernels on the same stream (or the default stream) will never execute 
+      concurrently; one starts only when the previous finishes all threads. So we just need to have our final kernel write to device-mapped memory 
+      on the host and perform a deviceSync at the end of the forward pass so that the output is available for sampling. 
+    </p>
+    <p>
+      An interesting deep dive here is our matmul kernel. We saw earlier that this function was a huge piece of runtime on the CPU, and optimizing it 
+      via OpenMP yielded huge wins. So let's make sure matmul is well-optimized before proceeding.
+    </p>
+    <p>
+      A naive implementation of matmul might look something like our OpenMP-parallelized CPU code, where we have each GPU thread handle computing 1 row (element) of the resulting vector:
+    </p>
+    <!-- <dt-code block language="clike"> -->
+      <pre class="l-middle">        <code class="language-clike">
+__global__
+void matmul(const float* A, const float* x, int n, int d, float* out) {
+	// A (d,n) @ x (n,) -&gt; out (d,)
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i &gt;= d) return;
+	float sum = 0.0;
+	for (int j = 0; j &lt; n; j++) {
+		sum += A[n * i + j] * x[j];
+	}
+	out[i] = sum;
+}
+
+/* usage */
+int MAX_THREADS_PER_BLOCK = 1024;
+matmul&lt;&lt;&lt;
+	(d + MAX_THREADS_PER_BLOCK - 1)/MAX_THREADS_PER_BLOCK, 
+	MAX_THREADS_PER_BLOCK
+&gt;&gt;&gt;(A, x, n, d, out);
+        </code>
+    </pre>
+  <!-- </dt-code> -->
+    <img src="./yalm-assets/mm-naive.png" class="l-middle" style="width: min(90vw, 500px)">
+    <p>
+      One big problem with this approach is that it will under-utilize our CUDA cores. Mistral-7B has a transformer input/output dimension of 4096, so if we're 
+      computing (for example) the last matmul before the output, we'll spin up 4096 threads. But an RTX 4090 can have 16384 simultaneous threads! Many of our cores 
+      will be sitting idle and we won't reach full FLOPs/s.
+    </p>
+    <p>
+      In addition to FLOPs, there's also memory load coalescing issues with this kernel - but more on that later. Suffice to say that substituting this kernel in 
+      for the one that we end up with leads to a throughput of 2.9 tok/s - slower than our CPU backend!
+    </p>
+    <p>
+      A better idea is to have one block per row. In this setup, each block will have exactly 1 warp, then we'll use a warp-stride loop to sum across the entire row. 
+      At the end, we can perform a <a href="https://developer.nvidia.com/blog/faster-parallel-reductions-kepler/">warp sum reduction</a> to combine results from all threads:
+    </p>
+    <!-- <dt-code block language="clike"> -->
+      <pre class="l-middle">        <code class="language-clike">
+__device__ 
+inline float warp_reduce_sum(float val) {
+  for (int offset = WARP_SIZE / 2; offset &gt; 0; offset /= 2)
+    val += __shfl_down(val, offset);
+
+  return val;
+}
+
+__device__
+inline float matmul_row(const float* row, const float* x, int offset, int dim) {
+	float sum = 0.0;
+	for (int j = offset; j &lt; dim; j += WARP_SIZE) {
+		float v = row[j] * x[j];
+		sum += v;
+	}
+	return warp_reduce_sum(sum);
+}
+
+__global__
+void matmul(const float* A, const float* x, int n, int d, float* out) {
+	// A (d,n) @ x (n,) -&gt; out (d,)
+	// PRECOND: Blocks are 1-D and same size as warp.
+	int i = blockIdx.x;
+	if (i &gt;= d) return;
+	int offset = threadIdx.x;
+	float rowSum = matmul_row(&amp;A[n * i], x, offset, n);
+	if (threadIdx.x == 0) {
+		out[i] = rowSum;
+	}
+}
+
+/* usage */
+int BLOCK_SIZE = WARP_SIZE;
+matmul&lt;&lt;&lt;d, BLOCK_SIZE&gt;&gt;&gt;(A, x, n, d, out);
+        </code>
+    </pre>
+  <!-- </dt-code> -->
+    <img src="./yalm-assets/mm-better.png" class="l-middle" style="width: min(90vw, 500px)">
+    <p>
+      We can adapt the above kernel to blocks with more than one warp (it's easiest to keep 1 warp per row) as well. I will leave this and the question 
+      of why that might be a good idea as an exercise for the reader. :)
+    </p>
+    <p>
+      This kernel has much better thread utilization and memory read coalescing. With it configured to 1 warp per block, even with the near-1-1 arrangement 
+      of functions to kernels, we get a throughput of 51.7 tok/s - pretty good performance for a preliminary implementation! That said, we still have a ways 
+      to go before catching up to llama.cpp or calm - what can we improve?
+    </p>
+    <p>
+      Profiling a generation with nsys shows a few interesting things. First, we see that our GPU is being used for nearly the entire generation time, despite 
+      the host-device syncs at the end of every forward pass. There are some gaps in the device thread, indicating occasional idle time, but they are on the 
+      order of microseconds, which means we aren't ever CPU-bound:
+    </p>
+    <img src="./yalm-assets/nsys-gaps.png" class="l-middle" style="width: min(90vw, 600px)">
+    <p>
+      Second, we can see that 94.4% of our kernel executions are matrix multiplications:
+    </p>
+    <img src="./yalm-assets/nsys-mostly-matmul.png" class="l-middle" style="width: min(90vw, 600px)">
+    <p>
+      This means that if we were to get rid of every other kernel, we'd at best run in 94.4% of our current time, which would take us from 51.7 tok/s to 54.8 tok/s 
+      throughput, which is not quite at our goal. So we still need to optimize our matrix multiplications.
+    </p>
+    <p>
+      That said, we can approximate getting rid of other kernels by fusing them together. In particular, there are a few kernels that we can fuse into the nearest matmul, 
+      and a few matmuls that we can fuse together. For example, we can fuse together <code>matmul</code> and <code>add_residuals</code> into a single <code>fused_matmul_add_residuals</code> 
+      that directly sums to the destination. The Mistral architecture also performs a gated sum of 2 matmuls at some point: <code>F.silu(w1(x)) * w3(x)</code> - and we can do 
+      all of this in one kernel as all operations have 1 thread write to 1 element of the output vector, and all have the same dimension output.
+    </p>
+    <p>
+      This can let us “blend” together 2 dependent operations. For the first example, <code>add_residuals</code> could not begin until all threads of <code>matmul</code> finished, 
+      which is problematic if individual threads of <code>matmul</code> take longer. Additionally we avoid one extra read and write from each thread to global memory. 
+    </p>
+    <p>
+      For the curious, the full change is <a href="https://github.com/andrewkchan/yalm/commit/7e3bb32a91117c9892363e8d2536b90cc2b1b2f3">here</a>. This takes us to 54.1 tok/s!
+    </p>
+    <p>
+      Now we can return to optimizing <code>matmul</code>. From profiling via <code>ncu</code>, <code>matmul</code> writes are not optimally coalesced. The relevant warning diagnostic 
+      is shown below:
+    </p>
+    <!-- <dt-code block language="plaintext"> -->
+      <pre class="l-middle">        <code class="language-plaintext">
+    Section: Memory Workload Analysis
+    --------------------------- ------------ ------------
+    Metric Name                  Metric Unit Metric Value
+    --------------------------- ------------ ------------
+    Memory Throughput           Gbyte/second       533.22
+    Mem Busy                               %        24.82
+    Max Bandwidth                          %        90.26
+    L1/TEX Hit Rate                        %        65.94
+    L2 Compression Success Rate            %            0
+    L2 Compression Ratio                                0
+    L2 Hit Rate                            %         2.03
+    Mem Pipes Busy                         %        28.33
+    --------------------------- ------------ ------------
+
+    Section: Memory Workload Analysis Tables
+		...
+    ----- --------------------------------------------------------------------------------------------------------------
+    WRN   The memory access pattern for stores from L1TEX to L2 is not optimal. The granularity of an L1TEX request to  
+          L2 is a 128 byte cache line. That is 4 consecutive 32-byte sectors per L2 request. However, this kernel only  
+          accesses an average of 1.0 sectors out of the possible 4 sectors per cache line. Check the Source Counters    
+          section for uncoalesced stores and try to minimize how many cache lines need to be accessed per memory        
+          request.                                                                                                      
+    ----- --------------------------------------------------------------------------------------------------------------
+		...
+        </code>
+    </pre>
+  <!-- </dt-code> -->
+    <p>
+      At this point it's helpful to define what it means for a load or store to global memory to be coalesced in CUDA. When 
+      threads in the same warp issue loads or stores to global memory, the loads or stores can be grouped together and 
+      performed as a single transaction if they are appropriately aligned and refer to consecutive regions of memory 
+      (see the diagrams in this <a href="https://stackoverflow.com/a/5044424/4151721">excellent SO post</a>).
+    </p>
+    <p>
+      This is important because GPU global memory transactions can only be done at certain levels of granularity (32, 64, or 
+      128 bytes). So if 32 threads in the same warp are reading or writing to distinct 4-byte floats, if the access is coalesced, 
+      a single transaction of 128 bytes will be performed, whereas if the access is not coalesced, 32 transactions of 32-bytes 
+      each may be performed, wasting a ton of bandwidth.
+    </p>
+    <p>
+      In our <code>matmul</code> kernel, reads are coalesced, but writes are not. We have 1 warp per block with each warp handling 1 output element, 
+      so we are issuing 1 write per block of minimum size 32 bytes but only updating a single 4-byte element. Increasing the number of 
+      warps per block does not help because coalescing is done at the warp level, not the block level. 
+    </p>
+    <p>
+      Instead, we can have each warp compute their own result, but then collect all results into lanes of the first warp, then have the first warp 
+      issue a single coalesced write. The block-wide collection can be done fast through shared memory. The kernel:
+    </p>
+    <!-- <dt-code block language="clike"> -->
+      <pre class="l-middle">        <code class="language-clike">
+__device__ inline float blocktranspose(float v, float def) {
+  // Performs block-and-warp transpose operation:
+  //   For a block containing K warps where lane 0 contains val_k,
+  //   this function returns:
+  //   - For warp 0, lane K: val_k
+  //   - For all other warps and lanes: def
+	int lane = threadIdx.x % warpSize;
+	int warp = threadIdx.x / warpSize;
+
+  // Will hold results of all warps.
+	// Capacity 32 since there can be at most 32 warps in a block.
+	__shared__ float sm[32];
+	if (lane == 0) sm[warp] = v;
+	__syncthreads();
+
+	return lane &lt; blockDim.x / warpSize ? sm[lane] : def;
+}
+
+template &lt;typename T&gt;
+__global__
+void matmul_wide(const T* A, const float* x, int n, int d, float* out) {
+	// A (d,n) @ x (n,) -&gt; out (d,)
+	// PRECOND: Block is 1-D and contains WPB warps.
+	int i = (blockIdx.x * blockDim.x + threadIdx.x) / warpSize;
+	if (i &gt;= d) return;
+	// Warp j computes sum for row at &lt;blockIdx.x*WPB + j&gt;
+  // Lane 0 of each warp will hold result
+	int k = threadIdx.x % warpSize;
+	float rowSum = matmul_row(&amp;A[n * i], x, k, n);
+  // Transpose values so lane k in warp 0 contains row at &lt;blockIdx.x*WPB + k&gt;
+  // For WPB=32, this allows us to coalesce 32 float32 writes into a single 128-byte store
+  rowSum = blocktranspose(rowSum, 1.0);
+	if (threadIdx.x &lt; blockDim.x / warpSize) {
+    int block_start_i = blockIdx.x * blockDim.x / warpSize;
+		out[block_start_i + k] = rowSum;
+	}
+}
+        </code>
+    </pre>
+  <!-- </dt-code> -->
+    <p>
+      Profiling this with <code>ncu</code> shows a nearly 10% improvement (from 600 usecs to 550 usecs) on toy matrix dimensions. 
+      After adapting the final LM classifier and block <code>fused_matmul_add_residual</code> kernels to use this improved coalescing, 
+      we reach 56.1 tok/s throughput, which finally takes us past llama.cpp on GPU:
+    </p>
+    <div class="l-middle">
+      <video controls="" src="./yalm-assets/gpu-final.mov" style="width: min(90vw, 500px)"></video>
+    </div>
+    
+    <dt-byline></dt-byline>
+    <h1 id="section-4">4. What's next</h1>
+    <br>
+    <p>
+      We've only scratched the surface of LLM inference performance. Even in our specific use case of local, completion-only, 
+      single-batch, single-GPU inference, there are lots of improvements to be made.
+    </p>
+    <p>
+      One major opportunity for improvement is in long context generations. 
+      </p><ul>
+        <li>
+          With short context lengths, attention is fast (as there are not too many tokens to communicate over) and decoding is 
+          instead dominated by other, non-context sensitive operations such as generating the q/k/v vector representations of the 
+          input and passing the attention block output through the feedforward network.
+        </li>
+        <li>
+          The story is different with long contexts. Attention costs grow linearly with the context size (though constrained by the 
+          sliding window size). Once our model has generated (or has in its context window) over a few thousand tokens, performance 
+          degrades to ~48 tok/s and attention kernels go from ~5% to &gt;10% of runtime.
+        </li>
+        <li>
+          Inference-specific attention implementations like <a href="https://pytorch.org/blog/flash-decoding/">Flash Decoding</a> could help here.
+        </li>
+      </ul>
+    <p></p>
+    <p>
+      Another opportunity is in the prompt pre-filling phase, where we have an existing sequence, similar to training time. A common optimization 
+      here is to use matrix-matrix multiplication instead of matrix-vector to prefill multiple KV cache entries at once. This also forms the basis of 
+      the <a href="https://twitter.com/karpathy/status/1697318534555336961">speculative decoding</a> generation idea, which takes advantage of the fact that pre-filling K tokens is not that much slower than generating a single token.
+    </p>
+    <p>
+      I'll also note that we are fast for FP16, but we're not FAST yet. Reaching 100 tok/s on our machine will require us to quantize more 
+      aggressively, to smaller data types like FP8, INT8, or INT4, or to quantize activations and KV cache entries as well as weights. 
+      Or to do computations natively in lower precision!
+    </p>
+    <p>
+      Finally, in a production implementation, it's much more practical to use libraries of kernels maintained by experts, which are usually 
+      state-of-the-art, like cuDNN kernels and cuBLAS. These libraries have had decades of work go into them and are made by the same folks designing 
+      the chips themselves, to the point where even approaching within 5% performance of cuBLAS on specific hardware and use case is considered an 
+      achievement. Of course, this route is also usually less fun :)
+    </p>
+  </dt-article>
+
+  <dt-appendix>
+    <h3>Appendix</h3>
+    <p>Following is the code used to benchmark huggingface transformers:</p>
+    <!-- <dt-code block language="python"> -->
+      <pre>        <code class="language-python">
+import time
+
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
+
+mistral_models_path = "../Mistral-7B-Instruct-v0.2"
+
+tokenizer = AutoTokenizer.from_pretrained(mistral_models_path)
+
+model = AutoModelForCausalLM.from_pretrained(mistral_models_path, torch_dtype=torch.float16)
+model.to("cuda")
+
+model_inputs = tokenizer(["Q: What is the meaning of life?"], return_tensors="pt").to("cuda")
+
+# do a warmup inference
+generated_ids = model.generate(**model_inputs, max_new_tokens=1, do_sample=True)[0].tolist()
+
+# benchmark
+start_time = time.time() 
+generated_ids = model.generate(**model_inputs, max_new_tokens=256, do_sample=True)[0].tolist()
+# decode with mistral tokenizer
+result = tokenizer.decode(generated_ids)
+end_time = time.time()
+
+elapsed_s = end_time - start_time
+print(result)
+
+num_tokens = len(generated_ids)
+
+print(f"Generation stats:\n" +
+      f"  {num_tokens} tokens\n" +
+      f"  throughput: {num_tokens/elapsed_s}tok/s\n" +
+      f"  latency: {elapsed_s/num_tokens}s/tok\n" +
+      f"  total: {elapsed_s}s\n")
+        </code>
+    </pre>
+  <!-- </dt-code> -->
+  </dt-appendix>
+
+  <script type="text/bibliography">
+  </script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      renderMathInElement(document.body);
+    });
+    const toc = document.getElementById("toc");
+    const sections = document.querySelectorAll(`[id^=section-]`);
+    for (let section of sections) {
+      const h = section.tagName;
+      const title = section.textContent;
+      const id = section.id;
+      const a = document.createElement("a");
+      a.href = `#${id}`;
+      a.textContent = title;
+      const li = document.createElement("li");
+      li.classList.add(`toc-${h}`);
+      for (let i = 0; i < id.length; i++) {
+          if (id[i] === ".") {
+              const tab = document.createElement("span");
+              tab.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+              li.appendChild(tab);
+          }
+      }
+      li.appendChild(a);
+      toc.appendChild(li);
+    }
+  </script>
+</article>
+
+</body></html>
