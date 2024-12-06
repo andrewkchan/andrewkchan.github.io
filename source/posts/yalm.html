@@ -1138,24 +1138,6 @@ att_mix&lt;&lt;&lt;blocks, tpb>>>(
       single-batch, single-GPU inference, there are lots of improvements to be made.
     </p>
     <p>
-      One major opportunity for improvement is in long context generations. 
-      <ul>
-        <li>
-          With short context lengths, attention is fast (as there are not too many tokens to communicate over) and decoding is 
-          instead dominated by other, non-context sensitive operations such as generating the q/k/v vector representations of the 
-          input and passing the attention block output through the feedforward network.
-        </li>
-        <li>
-          The story is different with long contexts. Attention costs grow linearly with the context size (though constrained by the 
-          sliding window size). Once our model has generated (or has in its context window) over a few thousand tokens, performance 
-          degrades to ~48 tok/s and attention kernels go from ~5% to >10% of runtime.
-        </li>
-        <li>
-          Inference-specific attention implementations like <a href="https://pytorch.org/blog/flash-decoding/">Flash Decoding</a> could help here.
-        </li>
-      </ul>
-    </p>
-    <p>
       One big opportunity is in the prompt pre-filling phase, where we have an existing sequence, similar to training time. A common optimization 
       here is to use matrix-matrix multiplication instead of matrix-vector to prefill multiple KV cache entries at once. This also forms the basis of 
       the <a href="https://twitter.com/karpathy/status/1697318534555336961">speculative decoding</a> generation idea, which takes advantage of the fact that pre-filling K tokens is not that much slower than generating a single token.
