@@ -19,7 +19,7 @@
     <script type="text/front-matter">
       title: "Fast LLM Inference From Scratch"
       published: December 2, 2024
-      description: "Maxing out single-GPU inference throughput without libraries"
+      description: "Pushing single-GPU inference throughput to the edge without libraries"
       authors:
       - Andrew Chan: http://andrewkchan.github.io
       affiliations:
@@ -102,7 +102,7 @@
   <dt-article>
     <div class="l-gutter caption" id="toc"><h4>Contents</h4></div>
     <h1>Fast LLM Inference From Scratch</h1>
-    <h2>Reaching state-of-the-art single-GPU inference throughput without libraries</h2>
+    <h2>Pushing single-GPU inference throughput to the edge without libraries</h2>
     <dt-byline></dt-byline>
     <p>
       This post is about building an LLM inference engine using C++ and CUDA from scratch without libraries.
@@ -924,33 +924,33 @@ inline float warp_reduce_sum(float val) {
 
 __global__
 void att_mix(
-	const float* vb, // (max_seq_len, n_kv_heads, head_dim) 
-	const float* att, // (n_heads, kv_len)
-	int head_dim, 
-	int n_heads, 
-	int n_kv_heads,
-	int seq_len, 
-	int max_seq_len, 
-	float* out // (n_heads, head_dim)
+  const float* vb, // (max_seq_len, n_kv_heads, head_dim) 
+  const float* att, // (n_heads, kv_len)
+  int head_dim, 
+  int n_heads, 
+  int n_kv_heads,
+  int seq_len, 
+  int max_seq_len, 
+  float* out // (n_heads, head_dim)
 ) {
-	// PRECOND: blocks are 1-D and blockDim.x == WARP_SIZE
-	int h = blockIdx.x;
-	int group_size = n_heads / n_kv_heads;
-	int g = h / group_size;
-	int i = blockIdx.y;
-	int offset = threadIdx.x;
-	int kv_stride = n_kv_heads * head_dim;
-	
-	const float* atth = att + max_seq_len * h;
-	const float* vh = vb + head_dim * g;
-	float* outh = out + head_dim * h;
-	
-	float sum = 0.0;
-	for (int t = offset; t &lt; seq_len; t += WARP_SIZE) {
-		sum += vh[kv_stride * t + i] * atth[t];
-	}
-	sum = warp_reduce_sum(sum);
-	if (offset == 0) outh[i] = sum;
+  // PRECOND: blocks are 1-D and blockDim.x == WARP_SIZE
+  int h = blockIdx.x;
+  int group_size = n_heads / n_kv_heads;
+  int g = h / group_size;
+  int i = blockIdx.y;
+  int offset = threadIdx.x;
+  int kv_stride = n_kv_heads * head_dim;
+  
+  const float* atth = att + max_seq_len * h;
+  const float* vh = vb + head_dim * g;
+  float* outh = out + head_dim * h;
+  
+  float sum = 0.0;
+  for (int t = offset; t &lt; seq_len; t += WARP_SIZE) {
+    sum += vh[kv_stride * t + i] * atth[t];
+  }
+  sum = warp_reduce_sum(sum);
+  if (offset == 0) outh[i] = sum;
 }
 
 /* usage */
@@ -960,9 +960,9 @@ dim3 blocks;
 blocks.x = n_heads;
 blocks.y = head_dim;
 att_mix&lt;&lt;&lt;blocks, tpb>>>(
-	vb, att, 
-	head_dim, n_heads, n_kv_heads, 
-	seq_len, max_seq_len, out
+  vb, att, 
+  head_dim, n_heads, n_kv_heads, 
+  seq_len, max_seq_len, out
 );
       </code>
     </pre>
@@ -996,35 +996,35 @@ att_mix&lt;&lt;&lt;blocks, tpb>>>(
         <code class="language-clike">
 __global__
 void att_mix(
-	const float* vb,  // (max_seq_len, n_kv_heads, head_dim) 
-	const float* att, // (n_heads, kv_len)
-	int head_dim, 
-	int n_heads, 
-	int n_kv_heads,
-	int seq_len, 
-	int max_seq_len, 
-	float* out // (n_heads, head_dim)
+  const float* vb,  // (max_seq_len, n_kv_heads, head_dim) 
+  const float* att, // (n_heads, kv_len)
+  int head_dim, 
+  int n_heads, 
+  int n_kv_heads,
+  int seq_len, 
+  int max_seq_len, 
+  float* out // (n_heads, head_dim)
 ) {
-	// PRECOND: blocks are 1-D and `out` has been zeroed
-	int h = blockIdx.x;
-	int group_size = n_heads / n_kv_heads;
-	int g = h / group_size;
-	int kv_stride = n_kv_heads * head_dim;
-	
-	const float* atth = att + max_seq_len * h;
-	const float* vh = vb + head_dim * g;
-	float* outh = out + head_dim * h;
-	
-	int t_per_thread = seq_len / gridDim.y;
-	int t_start = blockIdx.y * t_per_thread;
-	
-	for (int i = threadIdx.x; i &lt; head_dim; i += blockDim.x) {
-		float sum = 0.0;
-		for (int t = t_start; t &lt; t_start + t_per_thread; t++) {
-			sum += vh[kv_stride * t + i] * atth[t];	
-		}
-		atomicAdd(&outh[i], sum);
-	}
+  // PRECOND: blocks are 1-D and `out` has been zeroed
+  int h = blockIdx.x;
+  int group_size = n_heads / n_kv_heads;
+  int g = h / group_size;
+  int kv_stride = n_kv_heads * head_dim;
+  
+  const float* atth = att + max_seq_len * h;
+  const float* vh = vb + head_dim * g;
+  float* outh = out + head_dim * h;
+  
+  int t_per_thread = seq_len / gridDim.y;
+  int t_start = blockIdx.y * t_per_thread;
+  
+  for (int i = threadIdx.x; i &lt; head_dim; i += blockDim.x) {
+    float sum = 0.0;
+    for (int t = t_start; t &lt; t_start + t_per_thread; t++) {
+      sum += vh[kv_stride * t + i] * atth[t];	
+    }
+    atomicAdd(&outh[i], sum);
+  }
 }
 
 int max_t_per_thread = 256;
@@ -1036,9 +1036,9 @@ blocks.x = c.n_heads;
 blocks.y = (kv_len + max_t_per_thread - 1) / max_t_per_thread;
 cudaMemset(s.xb2(), 0, c.n_heads * c.head_dim * sizeof(float));
 att_mix&lt;&lt;&lt;blocks, tpb>>>(
-	vb, s.att(),
-	c.head_dim, c.n_heads, c.n_kv_heads, 
-	kv_len, c.max_seq_len, s.xb2()
+  vb, s.att(),
+  c.head_dim, c.n_heads, c.n_kv_heads, 
+  kv_len, c.max_seq_len, s.xb2()
 );
       </code>
     </pre>
@@ -1064,47 +1064,47 @@ att_mix&lt;&lt;&lt;blocks, tpb>>>(
         <code class="language-clike">
 __global__
 void att_mix(
-	const float* vb,  // (max_seq_len, n_kv_heads, head_dim) 
-	const float* att, // (n_heads, kv_len)
-	int head_dim, 
-	int n_heads, 
-	int n_kv_heads,
-	int seq_len, 
-	int max_seq_len, 
-	float* out // (n_heads, head_dim)
+  const float* vb,  // (max_seq_len, n_kv_heads, head_dim) 
+  const float* att, // (n_heads, kv_len)
+  int head_dim, 
+  int n_heads, 
+  int n_kv_heads,
+  int seq_len, 
+  int max_seq_len, 
+  float* out // (n_heads, head_dim)
 ) {
-	// PRECOND: blocks are 2-D (warp_size, t_stride)
-	int h = blockIdx.x;
-	int group_size = n_heads / n_kv_heads;
-	int g = h / group_size;
-	int kv_stride = n_kv_heads * head_dim;
-	
-	const float* atth = att + max_seq_len * h;
-	const float* vh = vb + head_dim * g;
-	float* outh = out + head_dim * h;
-	
-	int warp_id = threadIdx.y;
-	int t_stride = blockDim.y;
-	
-	// Capacity 32 since there can be at most 32 warps in a block.
+  // PRECOND: blocks are 2-D (warp_size, t_stride)
+  int h = blockIdx.x;
+  int group_size = n_heads / n_kv_heads;
+  int g = h / group_size;
+  int kv_stride = n_kv_heads * head_dim;
+  
+  const float* atth = att + max_seq_len * h;
+  const float* vh = vb + head_dim * g;
+  float* outh = out + head_dim * h;
+  
+  int warp_id = threadIdx.y;
+  int t_stride = blockDim.y;
+  
+  // Capacity 32 since there can be at most 32 warps in a block.
   __shared__ float shared[32];
-	
-	for (int i = threadIdx.x; i &lt; head_dim; i += warpSize) {
-		if (warp_id == 0) {
-			shared[threadIdx.x] = 0;
-		}
-		__syncthreads();
-		float sum = 0.0;
-		for (int t = warp_id; t &lt; seq_len; t += t_stride) {
-			sum += vh[kv_stride * t + i] * atth[t];	
-		}
-		atomicAdd(&shared[threadIdx.x], sum);
-		__syncthreads();
-		if (warp_id == 0) {
-			outh[i] = shared[threadIdx.x];
-			shared[threadIdx.x] = 0;
-		}
-	}
+  
+  for (int i = threadIdx.x; i &lt; head_dim; i += warpSize) {
+    if (warp_id == 0) {
+      shared[threadIdx.x] = 0;
+    }
+    __syncthreads();
+    float sum = 0.0;
+    for (int t = warp_id; t &lt; seq_len; t += t_stride) {
+      sum += vh[kv_stride * t + i] * atth[t];	
+    }
+    atomicAdd(&shared[threadIdx.x], sum);
+    __syncthreads();
+    if (warp_id == 0) {
+      outh[i] = shared[threadIdx.x];
+      shared[threadIdx.x] = 0;
+    }
+  }
 }
 
 dim3 tpb;
@@ -1113,9 +1113,9 @@ tpb.y = min(kv_len, max_threads_per_block / warp_size);
 dim3 blocks;
 blocks.x = c.n_heads;
 att_mix&lt;&lt;&lt;blocks, tpb>>>(
-	vb, s.att(),
-	c.head_dim, c.n_heads, c.n_kv_heads, 
-	kv_len, c.max_seq_len, s.xb2()
+  vb, s.att(),
+  c.head_dim, c.n_heads, c.n_kv_heads, 
+  kv_len, c.max_seq_len, s.xb2()
 );
       </code>
     </pre>
@@ -1144,8 +1144,7 @@ att_mix&lt;&lt;&lt;blocks, tpb>>>(
     </p>
     <p>
       Another opportunity is to fuse our attention kernels, which the naive implementation split into separate scoring, softmax, and mixing operations. 
-      This is essentially what FlashAttention does for training and FlashDecoding does for inference. I haven't tried this yet and expect there to be major 
-      improvements for long contexts.
+      This is essentially what FlashAttention does for training and FlashDecoding does for inference, with some clever insights about the underlying hardware.
     </p>
     <p>
       I'll also note that we are fast for FP16, but we're not FAST yet. Reaching 100 tok/s on our machine will require us to quantize more 
@@ -1178,6 +1177,7 @@ tokenizer = AutoTokenizer.from_pretrained(mistral_models_path)
 model = AutoModelForCausalLM.from_pretrained(mistral_models_path, torch_dtype=torch.float16)
 model.to("cuda")
 
+# short prompt
 model_inputs = tokenizer(["Q: What is the meaning of life?"], return_tensors="pt").to("cuda")
 
 # do a warmup inference
@@ -1185,7 +1185,7 @@ generated_ids = model.generate(**model_inputs, max_new_tokens=1, do_sample=True)
 
 # benchmark
 start_time = time.time() 
-generated_ids = model.generate(**model_inputs, max_new_tokens=256, do_sample=True)[0].tolist()
+generated_ids = model.generate(**model_inputs, max_new_tokens=1000, do_sample=True)[0].tolist()
 # decode with mistral tokenizer
 result = tokenizer.decode(generated_ids)
 end_time = time.time()
@@ -1193,12 +1193,14 @@ end_time = time.time()
 elapsed_s = end_time - start_time
 print(result)
 
-num_tokens = len(generated_ids)
+num_prompt_tokens = model_inputs["input_ids"].shape[-1]
+num_generated_tokens = len(generated_ids) - num_prompt_tokens
 
 print(f"Generation stats:\n" +
-      f"  {num_tokens} tokens\n" +
-      f"  throughput: {num_tokens/elapsed_s}tok/s\n" +
-      f"  latency: {elapsed_s/num_tokens}s/tok\n" +
+      f"  prompt: {num_prompt_tokens} tokens\n" +
+      f"  generated: {num_generated_tokens} tokens\n" +
+      f"  throughput: {num_generated_tokens/elapsed_s}tok/s\n" +
+      f"  latency: {elapsed_s/num_generated_tokens}s/tok\n" +
       f"  total: {elapsed_s}s\n")
         </code>
     </pre>
