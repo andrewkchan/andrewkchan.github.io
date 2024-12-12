@@ -1,5 +1,4 @@
 <toyb-post>
-  <toyb-draft></toyb-draft>
   <toyb-title>Fast LLM Inference From Scratch</toyb-title>
   <toyb-date>December 2 2024</toyb-date>
   <toyb-head>
@@ -1132,7 +1131,7 @@ att_mix&lt;&lt;&lt;blocks, tpb>>>(
     <h2 id="section-3.5">3.5 KV quantization and compiler gotchas</h2>
     <p>
       This last section is about KV cache quantization, which is a common optimization we haven't done yet, but also about some of 
-      the optimizations that the nvcc CUDA compiler does for you automatically, what can happen when they break, and how to fix them. 
+      the optimizations that the <code>nvcc</code> CUDA compiler does for you automatically, what can happen when they break, and how to fix them. 
       Earlier we saw how automatic vectorization needed to be made explicit when working with FP16 weights in our CPU backend, and as 
       we'll see, switching to an FP16 KV cache will require similar work.
     </p>
@@ -1243,8 +1242,8 @@ for (int t = warp_id; t &lt; seq_len; t += t_stride) {
     <img src="./yalm-assets/source-cuda-kv16.png" class="l-middle" style="width: min(90vw, 700px)">
     <p>
       Digging deeper, we can see that the compiled SASS instructions for the FP32 kernel have not only unrolled the loop into 4 iterations 
-      (=8 loads) at a time, but are also arranging the load (<code>LDG.E</code>) and arithmetic (<code>FFMA</code>) instructions so that the loads can be pipelined, 
-      in a form of automatic <a href="https://developer.nvidia.com/blog/boosting-application-performance-with-gpu-memory-prefetching/">prefetching</a>:
+      (=8 loads) at a time, but are also arranging the load (<code>LDG.E</code>) and arithmetic (<code>FFMA</code>) instructions so that the loads can be 
+      <a href="https://developer.nvidia.com/blog/boosting-application-performance-with-gpu-memory-prefetching/">prefetched</a>:
     </p>
     <img src="./yalm-assets/source-sass-kv32.png" class="l-middle" style="width: min(90vw, 700px)">
     <p class="caption">
@@ -1253,18 +1252,26 @@ for (int t = warp_id; t &lt; seq_len; t += t_stride) {
       </i>
     </p>
     <p>
-      The FP16 kernel SASS output neither unrolls nor pipelines any loads:
+      Prefetching is a big boost for loops where each iteration loads from global memory and is independent from the results 
+      of previous iterations. By unrolling 4 iterations of the loop and re-arranging all loads upfront, the compiler is able to hide 
+      the latency of the loads for the latter 3 iterations.
+    </p>
+    <p>
+      The FP16 kernel SASS does not even unroll any loop iterations, let alone rearrange loads:
     </p>
     <img src="./yalm-assets/source-sass-kv16.png" class="l-middle" style="width: min(90vw, 700px)">
     <p>
-      So how do we get this same pipelining to happen in the FP16 kernel? Unfortunately, just adding <code>#pragma unroll</code> to the loop does 
+      So how do we get prefetching in the FP16 kernel? Unfortunately, just adding <code>#pragma unroll</code> to the loop does 
       not cut it (at least on my <code>nvcc</code> and machine setup). We are at the whim of compiler heuristics; they gaveth to our FP32 kernel 
       but now taketh away, and may continue to taketh away unless we instead 
       <a href="https://developer.nvidia.com/blog/boosting-application-performance-with-gpu-memory-prefetching/">manually unroll and prefetch values</a>. 
     </p>
     <p>
-      Below, we have unrolled into 16 iterations (=32 loads) at a time, with some extra code to handle the iterations modulo 16. The use of scalars instead 
-      of an array to hold prefetch results allows us to fetch to registers rather than slower shared memory:
+      Below, we have unrolled into 16 iterations (=32 loads) at a time, with some extra code to handle the iterations modulo 16. 
+      We perform a batched prefetch<dt-fn>An even better solution might be to do a rolling prefetch using pipeline instructions. See the NVIDIA blog post linked above for more.</dt-fn> 
+      where at the start of every 16th iteration, we issue a batch of loads, then retrieve them one-at-a-time until our batch is depleted. 
+      The use of scalars instead of an array to hold prefetch results allows us to fetch to registers rather than slower 
+      shared memory:
     </p>
     <!-- <dt-code block language="clike"> -->
       <pre class="l-middle">
@@ -1320,7 +1327,7 @@ for (; t &lt; seq_len; t += t_stride) {
       </pre>
     <!-- </dt-code> -->
     <p>
-      The resulting kernel finally gets us the expected wins, getting ~75 μs vs. ~140 μs for the FP32 kernel in our toy <code>ncu</code> benchmark. 
+      The resulting kernel (<a href="https://github.com/andrewkchan/yalm/blob/5c7d634fdf88da76bd3d9ed98f517b49f8eb84d5/src/infer.cu#L393-L518">full code here</a>) finally gets us the expected wins, getting ~75 μs vs. ~140 μs for the FP32 kernel in our toy <code>ncu</code> benchmark. 
       And long context generations get faster as expected, from just over 57 tok/s to 58.8 tok/s. To top it all off, here's a video of 
       short context generation, where we get over 63.8 tok/s:
     </p>
@@ -1338,7 +1345,7 @@ for (; t &lt; seq_len; t += t_stride) {
     <p>
       Through this post, we've achieved close to state-of-the-art performance for a specific use case: local, completion-only, 
       single-batch, single-GPU inference on one model. We were able to do so with no libraries - just a few major optimizations 
-      and a lot of GPU programming elbow grease:
+      and a lot of CUDA/C++ elbow grease:
       <ul class="compact-li">
         <li>
           Multithreading and vectorization on the CPU
@@ -1356,7 +1363,8 @@ for (; t &lt; seq_len; t += t_stride) {
     </p>
     <p>
       One big opportunity is in the prompt pre-filling phase, where we have an existing sequence, similar to training time. A common optimization 
-      here is to use matrix-matrix multiplication instead of matrix-vector to prefill multiple KV cache entries at once. This also forms the basis of 
+      here is to use matrix-matrix multiplication instead of matrix-vector to prefill multiple KV cache entries at once; this would improve the time-to-first-token,
+      a metric just as important as raw token throughput for many applications. This also forms the basis of 
       the <a href="https://twitter.com/karpathy/status/1697318534555336961">speculative decoding</a> generation idea, which takes advantage of the fact that pre-filling K tokens is not that much slower than generating a single token.
     </p>
     <p>
@@ -1365,8 +1373,9 @@ for (; t &lt; seq_len; t += t_stride) {
     </p>
     <p>
       I'll also note that we are fast for FP16, but we're not FAST yet. Reaching 100 tok/s on our machine will require us to quantize more 
-      aggressively, to smaller data types like FP8, INT8, or INT4, or to quantize activations and KV cache entries as well as weights. 
-      Or to do computations natively in lower precision!
+      aggressively, to smaller data types like FP8, INT8, or INT4, or to quantize activations<dt-fn>This is often done during training, 
+      where we have large batches of activations that must be kept around for gradient computation in all layers. For single-batch inference it is less beneficial especially as we can reuse tensors between layers.</dt-fn>
+      and KV cache entries as well as weights. Or to do computations natively in lower precision!
     </p>
     <p>
       At a low level, there are lots of kernel-specific implementations to be made. Many of the kernels we ended up with still display 
