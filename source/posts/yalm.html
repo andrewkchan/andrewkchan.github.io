@@ -104,23 +104,21 @@
     <h1>Fast LLM Inference From Scratch</h1>
     <h2>Pushing single-GPU inference throughput to the edge without libraries</h2>
     <dt-byline></dt-byline>
+    <ul class="caption">
+      <li><i>Source code for this article on <a href="https://github.com/andrewkchan/yalm">GitHub</a>.</i></li>
+    </ul>
     <p>
       This post is about building an LLM inference engine using C++ and CUDA from scratch without libraries.
     </p>
     <p>
       Why? In doing so, we can learn about the full stack of LLM inference - which is becoming increasingly important<dt-fn>Especially as inference compute becomes a new axis with which AI models scale,
       and models are increasingly deployed locally to devices on the edge.</dt-fn> - from CUDA kernels to model architecture, and get a real sense of how different optimizations affect inference speed.
+      And one of the most important use cases is <i>running fast on a single prompt on consumer devices</i>.
     </p>
     <p>
-      Many areas in ML can feel quite inaccessible because they use complicated math. But <i>LLM inference</i> is something that systems programmers 
-      will feel right at home with. At the end of the day, it's about running a program on computers fast, and one of the most important use cases is running fast on a single prompt on consumer 
-      devices. Everyday programmers can - with just average <a href="https://knowyourmeme.com/memes/wordcel-shape-rotator-mathcel">shape rotator</a> skills and no H100 cluster - understand the 
-      major concepts here and code something approaching the state of the art. 
-    </p>
-    <p>
-      That's what this post will focus on: building a program that can load weights of common open models and do single-batch inference on them on a single CPU + GPU server, and iteratively 
-      improving the token throughput on our use case until it surpasses <a href="https://github.com/ggerganov/llama.cpp">llama.cpp</a>. Readers should have basic familiarity with large language 
-      models, attention, and transformers.
+      That's what we'll focus on: building a program that can load weights of common open models and do single-batch inference on them on a single CPU + GPU server, and iteratively 
+      improving the token throughput until it surpasses <a href="https://github.com/ggerganov/llama.cpp">llama.cpp</a>. Readers should have basic familiarity with large language 
+      models, attention, and transformers. The full source code is available on GitHub: <a href="https://github.com/andrewkchan/yalm">yalm (Yet Another Language Model)</a>.
     </p>
     <h3>Acknowledgements</h3>
     <ul class="compact-li">
@@ -273,7 +271,7 @@ void Block::block(InferenceState& s) {
           Every time we generate a token we need to read the entire model, performing only a few floating point operations per weight.
         </li>
         <li>
-          And modern CPUs and GPUs are <i>extremely</i> fast at floating point operations. The key metric is the FLOPs/s-to-memory-bandwidth-ratio (FLOPs/byte). 
+          Modern CPUs and GPUs are <i>extremely</i> fast at floating point operations. The key metric is the FLOPs/s-to-memory-bandwidth-ratio (FLOPs/byte). 
           For instance, the AMD Ryzen 7950X has about a 40:1 ratio, while the RTX 4090 has an 82:1 ratio. The AMD EPYC 7702P on my server has a less impressive, 
           but still significant 10:1 ratio.
         </li>
@@ -295,19 +293,6 @@ void Block::block(InferenceState& s) {
         </li>
         <li>
           <p>
-            Mistral-7B-Instruct-v0.2-FP16 with a 4k context window and FP32 KV-cache is <code>15557746688 bytes</code>
-          </p>
-          <ul class="compact-li">
-            <li>
-              <code>204.8e9 bytes/s / 15557746688 bytes/tok = ~13.2 tok/s</code> for EPYC 7702P
-            </li>
-            <li>
-              <code>1008e9 bytes/s / 15557746688 bytes/tok = ~64.8 tok/s</code> for RTX 4090
-            </li>
-          </ul>
-        </li>
-        <li>
-          <p>
             Mistral-7B-Instruct-v0.2-FP32 with a 4k context window and FP32 KV-cache is <code>29516398592 bytes</code>
           </p>
           <ul class="compact-li">
@@ -316,6 +301,19 @@ void Block::block(InferenceState& s) {
             </li>
             <li>
               This won't fit in the 24GB of RTX 4090 VRAM so we'll skip it.
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p>
+            Mistral-7B-Instruct-v0.2-FP16 with a 4k context window and FP16 KV-cache is <code>15020875776 bytes</code>
+          </p>
+          <ul class="compact-li">
+            <li>
+              <code>204.8e9 bytes/s / 15020875776 bytes/tok = ~13.6 tok/s</code> for EPYC 7702P
+            </li>
+            <li>
+              <code>1008e9 bytes/s / 15020875776 bytes/tok = ~67.1 tok/s</code> for RTX 4090
             </li>
           </ul>
         </li>
@@ -338,19 +336,19 @@ void Block::block(InferenceState& s) {
         <td>7.6 tok/s</td>
       </tr>
       <tr>
-        <td>huggingface transformers, GPU<dt-fn>See appendix for benchmark code. For some reason, this was the highest variance of all. Shown are a best of 3 run.</dt-fn></td>
-        <td>25.7 tok/s</td>
+        <td>huggingface transformers, GPU<dt-fn>See <a href="#appendix">appendix</a> for benchmark code. For some reason, this was the highest variance of all. Shown are a best of 3 run.</dt-fn></td>
         <td>25.9 tok/s</td>
+        <td>25.7 tok/s</td>
       </tr>
       <tr>
         <td>llama.cpp, GPU</td>
-        <td>55.08 tok/s</td>
-        <td>53.3 tok/s</td>
+        <td>61.0 tok/s</td>
+        <td>58.9 tok/s</td>
       </tr>
       <tr>
         <td>calm, GPU</td>
-        <td>57.6 tok/s</td>
-        <td>57.4 tok/s</td>
+        <td>66.0 tok/s</td>
+        <td>65.7 tok/s</td>
       </tr>
     </table>
     <dt-byline></dt-byline>
@@ -405,7 +403,7 @@ static void matmul(float* xout, float* x, float* w, int n, int d) {
     <div class="l-middle">
       <video controls src="./yalm-assets/cpu-openmp-mha.mov" style="width: min(90vw, 720px)"></video>
     </div>
-    <h2 id="section-2.2">2.2 Quantization and SIMD</h2>
+    <h2 id="section-2.2">2.2 Weight quantization and SIMD</h2>
     <p>
       The next potential opportunity is to use SIMD. The EPYC 7702P CPU supports AVX and AVX2, which let us work with 256-bit vectors of 8 packed float32 values at a time. 
       In our ubiquitous <code>matmul</code> function, we could try loading, multiplying, and accumulating 8 values at a time in the inner loop, which would let each thread finish 
@@ -490,7 +488,7 @@ static void matmul(float* xout, float* x, f16_t* w, int n, int d) {
     </pre>
   <!-- </dt-code> -->
     <p>
-      The resulting implementation does not yield any difference in perplexity for short texts. It's also nearly twice as fast at 8.2-8.4 tok/s:
+      <a href="https://github.com/andrewkchan/yalm/blob/462b3705a2dc75d2ae22e3b6a4c45d9b92bc20ea/src/infer.cpp">The resulting implementation</a> does not yield any difference in perplexity for short texts. It's also nearly twice as fast at 8.2-8.4 tok/s:
     </p>
     <div class="l-middle">
       <video controls src="./yalm-assets/cpu-f16c.mov" style="width: min(90vw, 720px)"></video>
@@ -508,7 +506,7 @@ static void matmul(float* xout, float* x, f16_t* w, int n, int d) {
     </p>
     <h2 id="section-3.1">3.1 A naive port to CUDA</h2>
     <p>
-      A first, naive implementation attempts to translate our CPU operations 1-1 to kernels, with some extra kernels for things like vector additions. 
+      <a href="https://github.com/andrewkchan/yalm/blob/ec8c8fec911794c788c50dfe5d42ae9e1ef0e905/src/infer.cpp">A first, naive implementation in 270 lines of C++/CUDA</a> attempts to translate our CPU operations 1-1 to kernels, with some extra kernels for things like vector additions. 
       So we end up with a fairly long list of kernels, but more importantly, host C++ code in our GPU backend which looks almost like our CPU backend, 
       but with the “dispatch kernel” triple-chevrons <code>&lt;&lt;&lt; . &gt;&gt;&gt;</code> attached to the function calls. For instance, here's the half of our block forward pass 
       in our GPU backend where we pass the activations through a feedforward network before adding back as residuals:
@@ -667,7 +665,7 @@ matmul&lt;&lt;&lt;d, BLOCK_SIZE>>>(A, x, n, d, out);
     </p>
     <h2 id="section-3.3">3.3 Fusing and even better matmuls</h2>
     <p>
-      Profiling a generation with nsys shows a few interesting things. First, we see that our GPU is being used for nearly the entire generation time, despite 
+      Profiling a generation with <code>nsys</code> shows a few interesting things. First, we see that our GPU is being used for nearly the entire generation time, despite 
       the host-device syncs at the end of every forward pass. There are some gaps in the device thread, indicating occasional idle time, but they are on the 
       order of microseconds, which means we aren't ever CPU-bound:
     </p>
@@ -761,7 +759,8 @@ __device__ inline float blocktranspose(float v, float def) {
   int warp = threadIdx.x / warpSize;
   
   // Will hold results of all warps.
-  // Capacity 32 since there can be at most 32 warps in a block.
+  // Each lane of the warp accumulates across 1 head element at a time.
+  // NOTE: Assumes warpSize is 32
   __shared__ float sm[32];
   if (lane == 0) sm[warp] = v;
   __syncthreads();
@@ -794,7 +793,7 @@ void matmul_wide(const T* A, const float* x, int n, int d, float* out) {
     <p>
       Profiling this with <code>ncu</code> shows a nearly 10% improvement (from 600 usecs to 550 usecs) on toy matrix dimensions. 
       After adapting the final LM classifier and block <code>fused_matmul_add_residual</code> kernels to use this improved coalescing, 
-      we reach 56.1 tok/s throughput, which finally takes us past llama.cpp on GPU:
+      we reach 56.1 tok/s throughput:
     </p>
     <div class="l-middle">
       <video controls src="./yalm-assets/gpu-fused-better-matmuls.mov" style="width: min(90vw, 720px)"></video>
@@ -804,7 +803,7 @@ void matmul_wide(const T* A, const float* x, int n, int d, float* out) {
     <p>
       One major opportunity for improvement is in long context generations. When generating 5k tokens, our model's 
       average throughput degrades to ~48 tok/s and attention kernels go from ~5% to >10% of runtime. Compare this to llama.cpp and calm, 
-      which are able to maintain ~53 tok/s and ~57 tok/s, respectively. What's going on?
+      which are able to maintain throughput in the high 50s or greater. What's going on?
     </p>
     <p>
       With short context lengths, attention is fast - as there are not too many tokens to communicate over - and decoding is instead dominated by other, 
@@ -1127,15 +1126,233 @@ att_mix&lt;&lt;&lt;blocks, tpb>>>(
       <video controls src="./yalm-assets/gpu-att-mix.mov" style="width: min(90vw, 720px)"></video>
     </div>
     <p>
-      Not too far off our 64.8 tok/s speed of light from <a href="#section-1.2">&sect;1.2</a>!
+      This finally gets us past llama.cpp's short generation throughput of 61.0 tok/s (see <a href="#section-1.2">&sect;1.2</a>)!
+    </p>
+
+    <h2 id="section-3.5">3.5 KV quantization and compiler gotchas</h2>
+    <p>
+      This last section is about KV cache quantization, which is a common optimization we haven't done yet, but also about some of 
+      the optimizations that the nvcc CUDA compiler does for you automatically, what can happen when they break, and how to fix them. 
+      Earlier we saw how automatic vectorization needed to be made explicit when working with FP16 weights in our CPU backend, and as 
+      we'll see, switching to an FP16 KV cache will require similar work.
+    </p>
+    <p>
+      First, a bit about KV cache quantization:
+      <ul class="compact-li">
+        <li>
+          In our benchmark setting earlier (<a href="#section-1.2">&sect;1.2</a>), llama.cpp and calm were actually using FP16 KV cache entries (because that is 
+          their default setting), and we calculated the speed-of-light assuming the same. 
+        </li>
+        <li>
+          Quantizing KV cache entries from FP32 to FP16 will not yield as large of a win as quantizing our weights did, since the KV cache 
+          comprises a much smaller part of the total memory, but we still expect a win nonetheless as the total memory read each forward pass 
+          will go from ~15.5 GB to ~15.0 GB. The effect should be largest for long contexts and our attention kernels, as the KV cache is 
+          only used in attention.
+        </li>
+      </ul>
+    </p>
+    <p>
+      Just switching our KV cache from FP32 to FP16 (while still performing computations in FP32, just like weight quantization) is simple 
+      and boils down to replacing <code>float*</code> with <code>half*</code> and inserting the <code>__half2float</code> intrinsic in a 
+      few key places: <a href="https://github.com/andrewkchan/yalm/commit/19a21912f2bd2e5ff0eb59bf5f3df1756038e3e0">see the code change here</a>. 
+      Ensuring that it's performant is another story.
+    </p>
+    <p>
+      Rather than make things faster, the naive patch above actually causes things to get slower. Long context generations are especially 
+      impacted, with throughput down to ~53.6 tok/s from ~57 tok/s, and the <code>att_mix</code> kernel going from 5.5% (29 μs avg.) to a whopping 13.3% 
+      of runtime (78 μs).
+    </p>
+    <img src="./yalm-assets/kernel-stats-kv32.png" class="l-middle" style="width: min(90vw, 700px)">
+    <p class="caption">
+      <i>nsys profile of a long context generation with FP32 KV cache</i>
+    </p>
+    <img src="./yalm-assets/kernel-stats-kv16.png" class="l-middle" style="width: min(90vw, 700px)">
+    <p class="caption">
+      <i>The same profile with our naive patch switching to FP16 KV cache</i>
+    </p>
+    <p>
+      An <code>ncu</code> profile on a toy example reveals that memory throughput for the att_mix kernel has gotten much worse, 
+      going from ~25.7% of the memory speed of light to ~6.8% and 140 μs to 309 μs. Why? One issue may be that we are simply issuing 
+      smaller memory transactions than we previously did in each iteration of our loop. Recall that in <code>att_mix</code>, each thread accumulates 
+      a sum over timesteps <code>t</code> like so:
+    </p>
+    <!-- <dt-code block language="clike"> -->
+    <pre class="l-middle">
+      <code class="language-clike">
+float sum = 0.0;
+for (int t = warp_id; t &lt; seq_len; t += t_stride) {
+  sum += vh[kv_stride * t + i] * atth[t];	
+}
+// atomicAdd `sum` when we're done
+      </code>
+    </pre>
+    <!-- </dt-code> -->
+    <p>
+      <code>vh</code> is now a half-precision array, so loads from it must be converted to FP32 before being used. Our naive 
+      patch does this by simply inserting a <code>__half2float</code> call:
+    </p>
+    <!-- <dt-code block language="clike"> -->
+      <pre class="l-middle">
+        <code class="language-clike">
+float sum = 0.0;
+for (int t = warp_id; t &lt; seq_len; t += t_stride) {
+  sum += __half2float(vh[kv_stride * t + i]) * atth[t];	
+}
+// atomicAdd `sum` when we're done
+        </code>
+      </pre>
+    <!-- </dt-code> -->
+    <p>
+      This results in lower throughput because even though loads are still being coalesced in each warp for each loop iteration, 
+      they are coalesced to 32 16-bit loads, or 64 bytes, which is lower than the maximum coalesced transaction size of 128 bytes 
+      that can be issued by a warp. We can try recovering this performance by vectorizing the loads into <code>half2</code> loads like so:
+    </p>
+    <!-- <dt-code block language="clike"> -->
+      <pre class="l-middle">
+        <code class="language-clike">
+float2 sum01 = make_float2(0.0, 0.0);
+for (int t = warp_id; t &lt; seq_len; t += t_stride) {
+  float2 v01 = __half22float2(*((half2*)&vh[kv_stride * t + i]));
+  float att_t = atth[t];
+  // Sadly CUDA does not have float2 SIMD ops
+  sum01.x += v01.x * att_t;
+  sum01.y += v01.y * att_t;
+}
+// atomicAdd both `sum01` lanes when we're done
+        </code>
+      </pre>
+    <!-- </dt-code> -->
+    <p>
+      This attempt (<a href="https://github.com/andrewkchan/yalm/commit/ce8efcd20a5f1c04e69ff05a334cbc3aa951eac1">full patch here</a>) 
+      improves the throughput somewhat, but it's still worse than the float32 version (188 μs vs. 140 μs, memory throughput 9.8% vs. 25.7%).
+    </p>
+    <p>
+      What's going on? Our KV cache loads should be coalesced to the same sizes as the FP32 version. The final writes we do are 
+      double the size, but reads far outnumber writes, and they should also still be coalesced. For hints, we collect a more 
+      detailed <code>ncu</code> profile with <code>-set full</code> and <code>-o report</code> to get a file that we can view in the NCU UI.
+    </p>
+    <p>
+      With this, we can see a very powerful line-by-line breakdown of the kernel being executed, with relevant stats and the corresponding 
+      PTX and SASS instructions per line. In particular we see that the line loading from <code>vb</code> in the FP32 kernel is secretly 
+      performing 8 32-bit loads:
+    </p>
+    <img src="./yalm-assets/source-cuda-kv32.png" class="l-middle" style="width: min(90vw, 700px)">
+    <p>
+      ...while the corresponding line in the FP16 kernel is performing only 1 32-bit load:
+    </p>
+    <img src="./yalm-assets/source-cuda-kv16.png" class="l-middle" style="width: min(90vw, 700px)">
+    <p>
+      Digging deeper, we can see that the compiled SASS instructions for the FP32 kernel have not only unrolled the loop into 4 iterations 
+      (=8 loads) at a time, but are also arranging the load (<code>LDG.E</code>) and arithmetic (<code>FFMA</code>) instructions so that the loads can be pipelined, 
+      in a form of automatic <a href="https://developer.nvidia.com/blog/boosting-application-performance-with-gpu-memory-prefetching/">prefetching</a>:
+    </p>
+    <img src="./yalm-assets/source-sass-kv32.png" class="l-middle" style="width: min(90vw, 700px)">
+    <p class="caption">
+      <i>
+        The highlighted lines all correspond to the single selected line in the CUDA code above in the FP32 kernel.
+      </i>
+    </p>
+    <p>
+      The FP16 kernel SASS output neither unrolls nor pipelines any loads:
+    </p>
+    <img src="./yalm-assets/source-sass-kv16.png" class="l-middle" style="width: min(90vw, 700px)">
+    <p>
+      So how do we get this same pipelining to happen in the FP16 kernel? Unfortunately, just adding <code>#pragma unroll</code> to the loop does 
+      not cut it (at least on my <code>nvcc</code> and machine setup). We are at the whim of compiler heuristics; they gaveth to our FP32 kernel 
+      but now taketh away, and may continue to taketh away unless we instead 
+      <a href="https://developer.nvidia.com/blog/boosting-application-performance-with-gpu-memory-prefetching/">manually unroll and prefetch values</a>. 
+    </p>
+    <p>
+      Below, we have unrolled into 16 iterations (=32 loads) at a time, with some extra code to handle the iterations modulo 16. The use of scalars instead 
+      of an array to hold prefetch results allows us to fetch to registers rather than slower shared memory:
+    </p>
+    <!-- <dt-code block language="clike"> -->
+      <pre class="l-middle">
+        <code class="language-clike">
+float2 sum01 = make_float2(0.0, 0.0);
+constexpr int UNROLL = 16;
+half2 v01_0; float att_0; 
+half2 v01_1; float att_1; 
+half2 v01_2; float att_2; 
+/* ... SNIP ... */
+half2 v01_15; float att_15;
+int t = warp_id;
+for (int ctr = 0; ctr &lt; seq_len / t_stride; t += t_stride, ctr++) {
+  int ctr_mod = ctr % UNROLL;
+  if (ctr_mod == 0) {
+    // prefetch every UNROLL iterations
+    #define PREFETCH(j) \
+      v01_##j = *((half2*)&vh[kv_stride * (t + j*t_stride) + i]); \
+      att_##j = atth[t + j*t_stride];
+    PREFETCH(0)
+    PREFETCH(1)
+    PREFETCH(2)
+    /* ... SNIP ... */
+    PREFETCH(15)
+    #undef PREFETCH
+  }
+  // pull one value out of prefetch batch
+  float2 v01;
+  float att_t;
+  switch (ctr_mod) {
+    #define CASE(j) \
+      case j: v01 = __half22float2(v01_##j); att_t = att_##j; break;
+    CASE(0)
+    CASE(1)
+    CASE(2)
+    /* ... SNIP ... */
+    CASE(15)
+    #undef CASE
+  }
+  // Sadly CUDA does not have float2 SIMD ops
+  sum01.x += v01.x * att_t;
+  sum01.y += v01.y * att_t;
+}
+// Handle any loop remainder that can't be unrolled
+for (; t &lt; seq_len; t += t_stride) {
+  float2 v01 = __half22float2(*((half2*)&vh[kv_stride * t + i]));
+  float att_t = atth[t];
+  sum01.x += v01.x * att_t;
+  sum01.y += v01.y * att_t;
+}
+// atomicAdd both `sum01` lanes when we're done
+        </code>
+      </pre>
+    <!-- </dt-code> -->
+    <p>
+      The resulting kernel finally gets us the expected wins, getting ~75 μs vs. ~140 μs for the FP32 kernel in our toy <code>ncu</code> benchmark. 
+      And long context generations get faster as expected, from just over 57 tok/s to 58.8 tok/s. To top it all off, here's a video of 
+      short context generation, where we get over 63.8 tok/s:
+    </p>
+    <div class="l-middle">
+      <video controls src="./yalm-assets/gpu-kv16.mov" style="width: min(90vw, 720px)"></video>
+    </div>
+    <p>
+      With this patch, we're now neck-and-neck with llama.cpp for long-context generations - at 58.7 tok/s vs. 58.8 tok/s - while handily 
+      beating it for short contexts at 63.8 tok/s vs. 61.0 tok/s. Not bad!
     </p>
     
     <dt-byline></dt-byline>
     <h1 id="section-4">4. What's next</h1>
     <br />
     <p>
-      We've only scratched the surface of LLM inference performance. Even in our specific use case of local, completion-only, 
-      single-batch, single-GPU inference, there are lots of improvements to be made.
+      Through this post, we've achieved close to state-of-the-art performance for a specific use case: local, completion-only, 
+      single-batch, single-GPU inference on one model. We were able to do so with no libraries - just a few major optimizations 
+      and a lot of GPU programming elbow grease:
+      <ul class="compact-li">
+        <li>
+          Multithreading and vectorization on the CPU
+        </li>
+        <li>
+          Matmul warp reductions + coalescing, kernel fusing, and better attention in our GPU backend
+        </li>
+        <li>
+          Weight + KV cache quantization for both backends
+        </li>
+      </ul>
+    </p>
+    <p>
+      That said, we've only scratched the surface of LLM inference performance. Even in our specific use case there are lots of improvements to be made.
     </p>
     <p>
       One big opportunity is in the prompt pre-filling phase, where we have an existing sequence, similar to training time. A common optimization 
@@ -1152,6 +1369,12 @@ att_mix&lt;&lt;&lt;blocks, tpb>>>(
       Or to do computations natively in lower precision!
     </p>
     <p>
+      At a low level, there are lots of kernel-specific implementations to be made. Many of the kernels we ended up with still display 
+      suboptimal performance, with several having memory throughput of less than 60% of the speed-of-light. Kernel optimization is a 
+      huge topic and many of the optimizations we discussed - memory coalescing, vectorization, pre-fetching, etc. - need to be combined 
+      in complex ways to really reach peak performance.
+    </p>
+    <p>
       Finally, in a production implementation, it's much more practical to use libraries of kernels maintained by experts, which are usually 
       state-of-the-art, like cuDNN kernels and cuBLAS. These libraries have had decades of work go into them and are made by the same folks designing 
       the chips themselves, to the point where even approaching <a href="https://siboehm.com/articles/22/CUDA-MMM">within 5% performance of cuBLAS</a> 
@@ -1160,8 +1383,13 @@ att_mix&lt;&lt;&lt;blocks, tpb>>>(
   </dt-article>
 
   <dt-appendix>
-    <h3>Appendix</h3>
-    <p>Following is the code used to benchmark huggingface transformers:</p>
+    <h3 id="appendix">Appendix</h3>
+    <p>
+      Following is the code used to benchmark huggingface transformers. Note the benchmarked program does not use <code>torch.compile</code>; my 
+      attempts to do so following the guide in the <a href="https://huggingface.co/docs/transformers/en/llm_optims#static-kv-cache-and-torchcompile">
+      HuggingFace LLM optimization docs</a> either did nothing or resulted in worse throughput, despite HuggingFace transformers supposedly supporting
+      the <a href="https://github.com/huggingface/transformers/issues/28981">use of <code>torch.compile</code> with Mistral</a>.
+    </p>
     <!-- <dt-code block language="python"> -->
       <pre>
         <code class="language-python">
