@@ -637,8 +637,11 @@ matmul&lt;&lt;&lt;
       for the one that we end up with leads to a throughput of 2.9 tok/s - slower than our CPU backend!
     </p>
     <p>
-      A better idea is to have one block per row. In this setup, each block will have exactly 1 warp, then we'll use a warp-stride loop to sum across the entire row. 
-      At the end, we can perform a <a href="https://developer.nvidia.com/blog/faster-parallel-reductions-kepler/">warp sum reduction</a> to combine results from all threads:
+      A better idea is to have one block per row. Threads within a block can efficiently cooperate, so we'll be able to leverage more threads to speed up computing the 
+      result for a single row. In this setup, each block will have exactly 1 warp (a smaller group of threads within a block which are a fundamental execution unit on the hardware, 
+      with their own <a href="https://developer.nvidia.com/blog/using-cuda-warp-level-primitives/">cooperation primitives</a>), then we'll use a warp-stride loop to 
+      sum across the entire row. At the end, we can perform a <a href="https://developer.nvidia.com/blog/faster-parallel-reductions-kepler/">warp sum reduction</a> 
+      to combine results from all threads:
     </p>
     <!-- <dt-code block language="clike"> -->
       <pre class="l-middle">        <code class="language-clike">
