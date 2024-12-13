@@ -499,15 +499,30 @@ static void matmul(float* xout, float* x, f16_t* w, int n, int d) {
     <br/>
     <p>
       Having quantized our model to half its size, we can now load it onto our RTX 4090 and begin a GPU inference implementation. 
-      Remember our rules: raw C++/CUDA only, no CUTLASS, cuBLAS, cuDNN, or other libraries. If you haven't seen CUDA code before, see 
-      <a href="https://docs.nvidia.com/cuda/cuda-c-programming-guide/#programming-model">Chapter 2</a> of the CUDA C++ Programming Guide 
-      for a good intro.
+      Remember our rules: raw C++/CUDA only, no CUTLASS, cuBLAS, cuDNN, or other libraries.
+    </p>
+    <p>
+      If you haven't seen CUDA code before, see <a href="https://docs.nvidia.com/cuda/cuda-c-programming-guide/#programming-model">Chapter 2</a> 
+      of the CUDA C++ Programming Guide for a good intro. At a high level, CUDA allows you to execute a C++ function (”kernel”) on the GPU in parallel over a <i>grid</i> of <i>threads</i> where:
+      <ul class="compact-li">
+        <li>
+          Each thread receives the same function arguments as all the others, but can make its own local variables, and is assigned its own <code>threadIdx</code> which can be used to determine 
+          what work it is responsible for.
+        </li>
+        <li>
+          Threads are additionally organized into blocks which have their own <code>blockIdx</code> and a fixed number of threads (<code>blockDim</code>). Threads in the same block can efficiently cooperate 
+          by sharing data through shared memory, which is faster than the global memory that all threads in a grid may otherwise access.
+        </li>
+        <li>
+          The number of blocks and threads per block is specified when invoking a kernel in triple-chevrons <code>&lt;&lt;&lt; numBlocks, threadsPerBlock >>></code> and may be given as <code>int</code> or <code>dim3</code>.
+        </li>
+      </ul>
     </p>
     <h2 id="section-3.1">3.1 A naive port to CUDA</h2>
     <p>
       <a href="https://github.com/andrewkchan/yalm/blob/ec8c8fec911794c788c50dfe5d42ae9e1ef0e905/src/infer.cpp">A first, naive implementation in 270 lines of C++/CUDA</a> attempts to translate our CPU operations 1-1 to kernels, with some extra kernels for things like vector additions. 
       So we end up with a fairly long list of kernels, but more importantly, host C++ code in our GPU backend which looks almost like our CPU backend, 
-      but with the “dispatch kernel” triple-chevrons <code>&lt;&lt;&lt; . &gt;&gt;&gt;</code> attached to the function calls. For instance, here's the half of our block forward pass 
+      but with <code>&lt;&lt;&lt; . &gt;&gt;&gt;</code> attached to the function calls. For instance, here's the half of our block forward pass 
       in our GPU backend where we pass the activations through a feedforward network before adding back as residuals:
     </p>
     <!-- <dt-code block language="clike"> -->
