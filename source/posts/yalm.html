@@ -342,7 +342,7 @@ void Block::block(InferenceState& s) {
       <tr>
         <td>llama.cpp, GPU</td>
         <td>61.0 tok/s</td>
-        <td>58.9 tok/s</td>
+        <td>58.8 tok/s</td>
       </tr>
       <tr>
         <td>calm, GPU</td>
@@ -502,8 +502,8 @@ static void matmul(float* xout, float* x, f16_t* w, int n, int d) {
       Remember our rules: raw C++/CUDA only, no CUTLASS, cuBLAS, cuDNN, or other libraries.
     </p>
     <p>
-      If you haven't seen CUDA code before, see <a href="https://docs.nvidia.com/cuda/cuda-c-programming-guide/#programming-model">Chapter 2</a> 
-      of the CUDA C++ Programming Guide for a good intro. At a high level, CUDA allows you to execute a C++ function (”kernel”) on the GPU in parallel over a <i>grid</i> of <i>threads</i> where:
+      If you haven't seen CUDA code before, see <a href="https://developer.nvidia.com/blog/easy-introduction-cuda-c-and-c/">An Easy Introduction to CUDA C and C++</a> for a good intro. 
+      At a high level, CUDA allows you to execute a C++ function (”kernel”) on the GPU in parallel over a <i>grid</i> of <i>threads</i> where:
       <ul class="compact-li">
         <li>
           Each thread receives the same function arguments as all the others, but can make its own local variables, and is assigned its own <code>threadIdx</code> which can be used to determine 
