@@ -5171,9 +5171,9 @@ var expandData = function(dom, data) {
 
   // paths
   if (!data.distillPath && !data.url) {
-    data.url = "http://distill.pub/";
+    data.url = "http://andrewkchan.dev/";
   } else if (!data.url) {
-    data.url = "http://distill.pub/" + data.distillPath;
+    data.url = "http://andrewkchan.dev/" + data.distillPath;
   }
   data.githubUrl = "https://github.com/" + data.githubPath;
 
@@ -5306,7 +5306,7 @@ var meta = function(dom, data) {
       { appendHead(("    <meta name=\"" + name + "\" content=\"" + (index$1(content)) + "\" >\n")); }
   }
 
-  appendHead(("\n    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=Edge,chrome=1\">\n    <link href=\"/rss.xml\" rel=\"alternate\" type=\"application/rss+xml\" title=\"Articles from Distill\">\n    <link rel=\"canonical\" href=\"" + (data.url) + "\">\n    <title>" + (data.title) + "</title>\n  "));
+  appendHead(("\n    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=Edge,chrome=1\">\n    <link href=\"/rss.xml\" rel=\"alternate\" type=\"application/rss+xml\" title=\"Blog Posts from andrewkchan.dev\">\n    <link rel=\"canonical\" href=\"" + (data.url) + "\">\n    <title>" + (data.title) + "</title>\n  "));
 
   appendHead(("\n    <!--  https://schema.org/Article -->\n    <meta property=\"article:published\" itemprop=\"datePublished\" content=\"" + (data.publishedYear) + "-" + (data.publishedMonthPadded) + "-" + (data.publishedDayPadded) + "\" />\n    <meta property=\"article:created\" itemprop=\"dateCreated\" content=\"" + (data.publishedDate) + "\" />\n    <meta property=\"article:modified\" itemprop=\"dateModified\" content=\"" + (data.updatedDate) + "\" />\n  "));
   data.authors.forEach(function (a) {
@@ -18189,7 +18189,52 @@ var header = function(dom, data) {
   }
 };
 
-var html$5 = "\n<style>\ndt-footer {\n  display: block;\n  color: rgba(255, 255, 255, 0.4);\n  font-weight: 300;\n  padding: 40px 0;\n  border-top: 1px solid rgba(0, 0, 0, 0.1);\n  background-color: hsl(200, 60%, 15%);\n  text-align: center;\n}\ndt-footer .logo svg {\n  width: 24px;\n  position: relative;\n  top: 4px;\n  margin-right: 2px;\n}\ndt-footer .logo svg path {\n  fill: none;\n  stroke: rgba(255, 255, 255, 0.8);\n  stroke-width: 3px;\n}\ndt-footer .logo {\n  font-size: 17px;\n  font-weight: 200;\n  color: rgba(255, 255, 255, 0.8);\n  text-decoration: none;\n  margin-right: 6px;\n}\ndt-footer .nav {\n  margin-top: 12px;\n}\ndt-footer .nav a {\n  color: rgba(255, 255, 255, 0.8);\n  margin-right: 6px;\n}\n</style>\n\n<div class=\"l-page\">\n  <div class=\"description\">\n  <a href=\"/\" class=\"logo\">\n    " + logo + "\n    Distill\n  </a>\n  is dedicated to clear explanations of machine learning\n  </div>\n  <div class=\"nav\">\n    <a href=\"http://distill.pub/about/\">About</a>\n    <a href=\"http://distill.pub/journal/\">Submit</a>\n    <a href=\"http://distill.pub/prize/\">Prize</a>\n    <a href=\"http://distill.pub/archive/\">Archive</a>\n    <a href=\"http://distill.pub/rss.xml\">RSS</a>\n    <a href=\"https://github.com/distillpub\">GitHub</a>\n    <a href=\"https://twitter.com/distillpub\">Twitter</a>\n    &nbsp;&nbsp;&nbsp;&nbsp; ISSN 2476-0757\n  </div>\n</div>\n";
+var html$5 = "\n<style>\n" + 
+"dt-footer {\n" + 
+"  display: block;\n" + 
+"  color: rgba(255, 255, 255, 0.4);\n" + 
+"  font-weight: 300;\n" + 
+"  padding: 40px 0;\n" + 
+"  border-top: 1px solid rgba(0, 0, 0, 0.1);\n" + 
+"  background-color: hsl(200, 60%, 15%);\n" + 
+"  text-align: center;\n" + 
+"}\n" + 
+"dt-footer .logo svg {\n" + 
+"  width: 24px;\n" + 
+"  position: relative;\n" + 
+"  top: 4px;\n" + 
+"  margin-right: 2px;\n" + 
+"}\n" + 
+"dt-footer .logo svg path {\n" + 
+"  fill: none;\n" + 
+"  stroke: rgba(255, 255, 255, 0.8);\n" + 
+"  stroke-width: 3px;\n" + 
+"}\n" + 
+"dt-footer .logo {\n" + 
+"  font-size: 17px;\n" + 
+"  font-weight: 200;\n" + 
+"  color: rgba(255, 255, 255, 0.8);\n" + 
+"  text-decoration: none;\n" + 
+"  margin-right: 6px;\n" + 
+"}\n" + 
+"dt-footer .nav {\n" + 
+"  margin-top: 12px;\n" + 
+"}\n" + 
+"dt-footer .nav a {\n" + 
+"  color: rgba(255, 255, 255, 0.8);\n" + 
+"  margin-right: 6px;\n" + 
+"}\n" + 
+"</style>\n" + 
+"\n" + 
+"<div class=\"l-page\">\n" + 
+"  <div class=\"description\">\n" + 
+"  Andrew Chan's blog\n" + 
+"  </div>\n" + 
+"  <div class=\"nav\">\n" + 
+"    <a href=\"http://andrewkchan.dev/\">Index</a>\n" + 
+"    &nbsp;&nbsp;&nbsp;&nbsp; \n" + 
+"  </div>\n" + 
+"</div>\n";
 
 var footer = function(dom, data) {
   var el = dom.querySelector("dt-footer");
