@@ -648,7 +648,7 @@ matmul&lt;&lt;&lt;
 __device__ 
 inline float warp_reduce_sum(float val) {
   for (int offset = WARP_SIZE / 2; offset &gt; 0; offset /= 2)
-    val += __shfl_down(val, offset);
+    val += __shfl_down_sync(0xffffffff, val, offset);
 
   return val;
 }
@@ -941,7 +941,7 @@ void matmul_wide(const T* A, const float* x, int n, int d, float* out) {
 __device__ 
 inline float warp_reduce_sum(float val) {
   for (int offset = WARP_SIZE / 2; offset &gt; 0; offset /= 2)
-    val += __shfl_down(val, offset);
+    val += __shfl_down_sync(0xffffffff, val, offset);
 
   return val;
 }
