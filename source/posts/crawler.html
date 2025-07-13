@@ -1,0 +1,383 @@
+<toyb-post>
+  <toyb-title>Crawling a billion web pages in just over 24 hours, in 2025</toyb-title>
+  <toyb-date>July 13 2025</toyb-date>
+  <toyb-draft></toyb-draft>
+  <toyb-head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-HYB0C59DXR');
+    </script>
+
+    <script type="text/front-matter">
+      title: "Crawling a billion web pages in just over 24 hours, in 2025"
+      published: July 13, 2025
+      description: ""
+      authors:
+      - Andrew Chan: http://andrewkchan.github.io
+      affiliations:
+      -
+    </script>
+
+    <style>
+      .compact-li li {
+        margin-bottom: 0.5em;
+      }
+      .caption {
+        font-size: 15px;
+        line-height: 1.3em;
+      }
+      #toc {
+          line-height: 0.3em;
+          width: calc(984px - 648px);
+      }
+      @media (min-width: 1280px) {
+          #toc {
+              margin-right: 72px;
+              position: sticky; 
+              top: 72px;
+              z-index: 2;
+          }
+      }
+      #toc > li {
+          list-style-type: none;
+      }
+      .l-gutter {
+          position: relative;
+          background-color: white;
+      }
+    </style>
+  </toyb-head>
+  <dt-article>
+    <div class="l-gutter caption" id="toc"><h4>Contents</h4></div>
+    <h1>Crawling a billion web pages in just over 24 hours, in 2025</h1>
+    <h2></h2>
+    <dt-byline></dt-byline>
+    <!-- <ul class="caption">
+      <li><i>Source code for this article on <a href="https://github.com/andrewkchan/yalm">GitHub</a>.</i></li>
+      <li><i>Discussion on <a href="https://news.ycombinator.com/item?id=42417857">Hacker News</a>.</i></li>
+    </ul> -->
+    <p>
+      For some reason, nobody's written about what it takes to crawl a big chunk of the web in a while: the last point of reference I saw was Michael Nielsen's post from 2012<dt-cite key="nielsen2012crawl"></dt-cite>.
+    </p>
+    <p>
+      Obviously lots of things have changed since then. Most bigger, better, faster: CPUs have gotten a lot more cores, spinning disks have been replaced by NVMe solid state drives with near-RAM 
+      I/O bandwidth, network pipe widths have exploded, EC2 has gone from a tasting menu of instance types to a whole rolodex's worth, yada yada. But some harder: much more of the web is dynamic, 
+      with heavier content too. How has the state of the art changed? Have the bottlenecks shifted, and would it still cost <a href="https://news.ycombinator.com/item?id=17461384">~$41k to bootstrap your own Google</a>? 
+      I wanted to find out, so I built and ran my own web crawler under similar constraints.
+    </p>
+    <dt-byline></dt-byline>
+    <h1 id="section-1">Problem statement</h1>
+    <p>
+      <b>Time limit of 24 hours</b>. Because I thought a billion pages crawled in a day was achievable based on preliminary experiments and 40 hours doesn't sound as cool. In my final crawl, the 
+      average active time of each machine was 25.5 hours with a tiny bit of variance. This doesn't include a few hours for some machines that had to be restarted.
+    </p>
+    <p>
+      <b>Budget of a few hundred dollars</b>. Nielsen's crawl cost a bit under $580. I'm lucky enough to have some disposable income saved up, and aimed for my final crawl to fit in the same. The 
+      final run including only the 25.5 active hours cost about $462. I also ran a bunch of small-scale experiments while optimizing the single-node system (which cost much less) and a second 
+      large-scale experiment to see how far I could take vertical scaling (which I cut off early, but was in the same ballpark).
+    </p>
+    <p>
+      <b>HTML only</b>. The elephant in the room. <a href="https://web.archive.org/web/20170607105910/https://sonniesedge.co.uk/blog/a-day-without-javascript">Even by 2017</a> much of the web had 
+      come to require JavaScript. But I wanted an apples-to-apples comparison with older web crawls, and in any case, I was doing this as a side project and didn't have time to add and optimize 
+      a bunch of playwright workers. So I did things the old fashioned way: request all links, but don't run any JS - just parse the HTML as-is and add all links from <code>&lt;a&gt;</code> tags to the frontier.
+      I was also curious how much of the web can still be crawled this way; as it turns out a lot!
+    </p>
+    <p>
+      <b>Politeness</b>. This is super important! I've read a couple stories (<a href="https://drewdevault.com/2025/03/17/2025-03-17-Stop-externalizing-your-costs-on-me.html">example</a>) about how much 
+      pain is caused to admins by massive web crawls that don't respect robots.txt, spoof other agents to evade blocks, and relentlessly hammer endpoints. I followed the same rules as Nielsen: I adhered 
+      to robots.txt, added an informative user agent containing my contact information, maintained a list of excluded domains which I would add to on request, stuck to my seed list of the top 1 million 
+      domains to avoid hitting mom-and-pop sites, and enforced a 70 second minimum delay between hitting the same domain.
+    </p>
+    <p>
+      <b>Fault-tolerance</b>. This was important in case I needed to stop and resume the crawl for whatever reason (which I did). It also helped a lot for experiments because in my one-time crawl 
+      procedure, the performance characteristics were state-dependent: the beginning of the crawl looked pretty different than steady-state. I didn't aim for perfect fault tolerance; losing some 
+      visited sites in the recovery after a crash or failure was fine, because my crawl was fundamentally a sample of the web.
+    </p>
+    <h1 id="section-2">High-level design</h1>
+    <p>
+      The design I ended up with looked pretty different than the typical crawler solution for systems design interviews, which generally disaggregates the functions (parsing, fetching, datastore, 
+      crawl state) into totally separate machine pools. What I went with instead was a cluster of a dozen highly-optimized independent nodes, each of which contained all the crawler functionality 
+      and handled a shard of domains. I did this because:
+      <ul class="compact-li">
+        <li>
+          I was operating under a limited budget for both experiments and the final run, so it made sense for me to start small, pack as much as possible onto a single machine, and then scale that up.
+        </li>
+        <li>
+          I'd actually started with the goal of maximizing performance of a single machine rather than the goal above of a billion pages in 24 hours (which I added halfway through). Even after adding 
+          that goal, I was still really optimistic about vertical scaling, and only gave up and moved to a cluster design when I started to approach my self-imposed deadline.
+        </li>
+      </ul>
+    </p>
+    <img src="./crawler-assets/crawler-design.png" alt="Crawler design" class="l-middle" style="width: min(90vw, 800px)" />
+    <p>
+      In detail, each node consisted of the following:
+      <ul class="compact-li">
+        <li>
+          <p>
+            <b>A single Redis instance</b> storing data structures representing the crawl state:
+            <ul class="compact-li">
+              <li>
+                <b>Per-domain frontiers</b>, or lists of URLs to crawl
+              </li>
+              <li>
+                <b>Queue of domains</b> ordered by the next timestamp at which they could be fetched based on their crawl delay (so that all domains ready to be fetched would be at the head of the queue)
+              </li>
+              <li>
+                <b>Entries for all visited URLs</b>, with each URL associated with some metadata and path to the saved content on disk (if the fetch successfully retrieved text content)
+              </li>
+              <li>
+                <b>Seen URLs bloom filter</b> so that we could quickly determine whether a URL had been added the frontier already. This was separate from the visited entries because we didn't want to add 
+                a URL to a frontier if it was already there (but not yet fetched). The small probability of the bloom filter giving false positives (incorrectly saying that a URL has been seen already when 
+                it hasn't) was fine because again, I'd decided my crawl was a sample of the internet, and I was optimizing for speed.
+              </li>
+              <li>
+                <b>Domain metadata</b>, including whether a domain was manually excluded, part of the original seed list, and the full content of its robots.txt (+ robots expiration timestamp).
+              </li>
+              <li>
+                <b>Parse queue</b> containing the fetched HTML pages for the parsers to process.
+              </li>
+            </ul>
+          </p>
+        </li>
+        <li>
+          <p>
+            <b>Pool of fetcher processes:</b>
+            <ul class="compact-li">
+              <li>
+                Fetchers operated in a simple loop: pop the next ready domain from redis, then pop the next URL from its frontier and fetch it (+ replace the domain in the ready queue), then push the result onto 
+                the parse queue.
+              </li>
+              <li>
+                Each process packed high concurrency onto a single core via asyncio; I empirically found fetchers could support 6000-7000 “workers” (independent asynchronous fetch loop). Note this didn't come 
+                close to saturating network bandwidth: the bottleneck was the CPU, which I'll go into later. The async design is a form of user-space multitasking and has been popular for a while for high 
+                concurrency systems (Python Tornado came out in 2009!) because it avoids context switching entirely.
+              </li>
+              <li>
+                Both fetchers and parsers also maintained LRU caches of important domain data such as robots.txt content so as to minimize load on redis.
+              </li>
+            </ul>
+          </p>
+        </li>
+        <li>
+          <p>
+            <b>Pool of parser processes:</b>
+            <ul class="compact-li">
+              <li>
+                Parsers operated similarly to fetchers; each consisted of 80 async workers pulling the next item from the parse queue, parsing the HTML content, extracting links to write back to the appropriate 
+                domain frontiers in redis, and writing the saved content to persistent storage. The reason the concurrency was much lower is because parsing is CPU-bound rather than IO-bound (although parsers 
+                still needed to talk to redis and occasionally fetch robots.txt), and 80 workers was enough to saturate the CPU.
+              </li>
+            </ul>
+          </p>
+        </li>
+        <li>
+          <p>
+            <b>Other:</b>
+            <ul class="compact-li">
+              <li>
+                For persistent storage, I followed prior art and used instance storage. The textbook interview solution will tell you to use S3; I considered this, but S3 charges per-request as well as 
+                pro-rated GB-months, and holding 1 billion pages assuming 250KB per page (250TB total) for just a single day would've cost <code>0.022*1000*250*(1/30)+0.005*1e6 = 5183.33</code> with the standard tier 
+                or <code>0.11*1000*250*(1/30)+0.00113*1e6 = 2046.67</code> with express - an order of magnitude over what I ended up spending! Even ignoring all PUT costs, it would've been $183.33 at standard or $916.67 
+                at express to hold my data for a day, meaning even if I'd batched pages together it wouldn't have been competitive.
+              </li>
+              <li>
+                I ended up going with the <code>i7i</code> series of storage-optimized instances, and truncated my saved pages to ensure they fit. Obviously truncating wouldn't be a good idea for a real 
+                crawler; I thought about using a fast compression method in the parser like snappy or a slower, background compressor, but didn't have time to try.
+              </li>
+              <li>
+                The first fetcher process in the pool was also designated the “leader” and would periodically write metrics to a local prometheus DB. In a real system it would've been better to have a single 
+                metrics DB for all nodes.
+              </li>
+            </ul>
+          </p>
+        </li>
+      </ul>
+    </p>
+    <p>
+      The final cluster consisted of:
+      <ul class="compact-li">
+        <li>12 nodes</li>
+        <li>Each on an `i7i.4xlarge` machine with 16 vCPUs, 128GB RAM, 10Gbps network bandwidth, and 3750GB instance storage</li>
+        <li>Each centered around 1 redis process + 9 fetcher processes + 6 parser processes</li>
+      </ul>
+    </p>
+    <p>
+      The domain seed list was sharded across the nodes in the cluster with no cross-node communication. Since I also only crawled seeded domains, that meant nodes crawled their own non-overlapping 
+      regions of the internet. This was mainly because I ran out of time trying to get my alternate design (with cross-communication) working.
+    </p>
+    <p>
+      Why just 12 nodes? I found in one experiment that sharding the seed domains too thin led to a serious hot shard problem where some nodes with very popular domains had lots of work to do while 
+      others finished quickly. I also stopped the vertical scaling of the fetcher and parser pools at 15 processes total per redis process because redis began to hit 120 ops/sec and I'd read that any 
+      more would cause issues (given more time, I would've ran experiments to find the exact saturation point).
+    </p>
+    <h3 id="section-2.1">Alternatives investigated</h3>
+    <p>
+      Before ending on the design above, I tried pretty hard to make vertically scaling a single node work; I was optimistic about this because so many of the hardware bottlenecks that had 
+      restricted past big crawls<dt-cite key="nielsen2012crawl"></dt-cite><dt-cite key="callan2009sapphire"></dt-cite> to distributed systems seemed to have disappeared. For instance, AWS offers a <code>i7i.48xlarge</code> instance which is essentially just 12 
+      <code>i7i.4xlarge</code> machines stuck together. It has quite a bit less network bandwidth (100Gbps instead of 12x25Gbps), but at the throughput needed to hit 1 billion pages in 24 hours, 
+      even if every page was 1MB (which wasn't the case), I'd only be using <code>8*1e6*(1e9/86400)=92Gbps</code>, with room leftover for outbound (which certainly wasn't 1MB per request!).
+    </p>
+    
+    <h2 id="section-3">Learnings</h2>
+    <h3 id="section-3.1">Parsing is a big bottleneck</h3>
+    <p>
+      I was really surprised by how much of a bottleneck parsing was. In the final system, I only had to allocate processes in a 2:3 parsing-to-fetching ratio, but it didn't start that way, and 
+      it took many iterations to get there. In fact, in the first system I built with dedicated parsing/fetching processes, 2 parsers were needed to keep up with 1 (partially idle) fetcher with 
+      1000 workers running at 55 pages/sec. It really looked like parsing was going to keep me from hitting a billion on budget!
+    </p>
+    <p>
+      This was really surprising to me because it meant my quad-core node wasn't achieving the same throughput that a weaker quad-core box could in 2012. Profiles showed that parsing was clearly 
+      the bottleneck, but I was using the same <code>lxml</code> parsing library that was popular in 2012 (as suggested by Gemini). I eventually figured out that it was because the average web page has gotten 
+      a lot bigger: metrics from a test run indicated the P50 uncompressed page size is now 138KB<dt-fn>This doesn't match the “median page weight” of 18KB reported by the <a href="https://almanac.httparchive.org/en/2024/page-weight">2024 Web Almanac</a>, 
+      but it's possible it has to do with the domains I crawled, which were limited to the top million or so domains according to a mix of Cisco and Cloudflare datasets.</dt-fn>, while the mean is even larger at 242KB - many times larger than Nielsen's estimated average of 
+      51KB in 2012!
+    </p>
+    <p>
+      Two things ended up helping the most:
+      <ul class="compact-li">
+        <li>
+          I switched from <code>lxml</code> to <code>selectolax</code>, a much newer library wrapping Lexbor, a modern parser in C++ designed specifically for HTML5. The page claimed it can 
+          be 30 times faster than lxml. It wasn't 30x overall, but it was a huge boost.
+        </li>
+        <li>
+          I also truncated page content to 250KB before passing it to the parser. Since the truncation threshold is above the mean and nearly double the median, I think the rationale from 
+          Nielsen still holds: we're capturing most web pages in their entirety, which should be enough for most applications.
+        </li>
+      </ul>
+    </p>
+    <p>
+      With this setup, I was able to achieve ~160 pages parsed per second with a single parser process, which allowed my final setup to use 9x fetchers and 6x parsers to crawl ~950 pages/sec.
+    </p>
+    <h3 id="section-3.2">Fetching: both easier and harder</h3>
+    <p>
+      Many treatments of crawling take network bandwidth and DNS to be important bottlenecks. For instance, while researching this topic I emailed <a href="https://www.cs.cmu.edu/~callan/">Jamie Callan</a> 
+      from CMU about the Sapphire project from 2009<dt-cite key="callan2009sapphire"></dt-cite>; Professor Callan told me that DNS resolution throughput was a bottleneck, and for a later crawl in 
+      2012 which used the CMU campus network, the crawl throughput had to be throttled to avoid using all of the bandwidth. A <a href="https://www.hellointerview.com/learn/system-design/problem-breakdowns/web-crawler">HelloInterview analysis</a> 
+      from about a year ago also suggests optimizations for DNS resolution.
+    </p>
+    <p>
+      For my crawl, DNS didn't come up at all. I think this is because I limited crawling to my seed list of the top ~1 million domains. Network bandwidth also wasn't near saturated for any of the 
+      nodes in the cluster; most nodes averaged around 1 GB/s (8 Gbps) at steady state, but the max bandwidth for <code>i7i.4xlarge</code> is 25 Gbps. Datacenter bandwidth is abundant these days, especially 
+      for AI: AWS offers a <a href="https://aws.amazon.com/ec2/instance-types/p6/">P6e-GB200</a> instance with 28.8 <i>terabits</i> of network bandwidth!
+    </p>
+    <p>
+      That said, one part of fetching got harder: a LOT more websites use SSL now than a decade ago. This was crystal clear in profiles, with SSL handshake computation showing up as the most 
+      expensive function call, taking up a whopping 25% of all CPU time on average, which - given that we weren't near saturating the network pipes, meant fetching became bottlenecked by the CPU 
+      before the network!
+    </p>
+    <img src="./crawler-assets/ssl.png" alt="SSL growth" class="l-middle" style="width: min(90vw, 800px)" />
+    <p class="caption">
+      <i>
+        From <a href="https://letsencrypt.org/stats/">https://letsencrypt.org/stats/</a> - SSL loads in Firefox have gone from 30% in 2014 to >80% in 2025.
+      </i>
+    </p>
+    <h3 id="section-3.3">The big crawl</h3>
+    <img src="./crawler-assets/shard6-metrics1.png" alt="Metrics for a node early in the crawl" class="l-middle" style="width: min(90vw, 800px)" />
+    <img src="./crawler-assets/shard6-metrics2.png" alt="Metrics for a node early in the crawl" class="l-middle" style="width: min(90vw, 800px)" />
+    <p class="caption">
+      <i>
+        Metrics for one of the nodes early on in the crawl. Some of the units in the grafana dashboard are wrong (e.g. error rate and parse queue size are using “bytes” by mistake)
+      </i>
+    </p>
+    <p>
+      Before running the big crawl with 12 <code>i7i.4xlarge</code> nodes, the biggest experiment I'd done had been a several-hour run on a single <code>i7i.2xlarge</code>, so there were quite a few surprises from the 
+      leap in scale that emerged over the course of the run, and I spent an entire Sunday from sunrise to sunset (and beyond) being oncall for my own run, watching metrics and hopping into to fix 
+      issues. Some of these were stupid operational oversights like forgetting to set up log rotation and then running out of space on the root volume, but the biggest issue was memory growth due 
+      to the frontiers. 
+    </p>
+    <p>
+      This was specific to my design, which placed all frontier data in-memory. I'd had memory issues on the earlier, smaller-scale crawls too, but on other components such as the HTTP client or 
+      the visited entries. I'd calculated out the memory headroom needed for 1 billion visited pages across those components, but failed to anticipate that the frontiers of certain very hot domains 
+      would grow to become tens of gigabytes (hundreds of millions or billions of URLs), and halfway through the run, my nodes started dropping like flies. I had to manually intervene by restarting
+       machines which had become unresponsive and truncating frontiers. Luckily the fault tolerance made resumption after fixing easy.
+    </p>
+    <p>
+      Were the problematic domains tarpits? From what I could tell, most were just really popular websites with lots of links. For example, <code>yahoo.com</code> and <code>wikipedia.org</code>
+      were among them. Another was a “cosplayfu” website which looked like a strange shopping site on first glance, but after searching on the internet seemed legit. In any case, the most problematic 
+      domains were simply added to my manual exclusion list.
+    </p>
+
+    <h2 id="section-4">Discussion</h2>
+    <h3 id="section-4.1">Theory vs. Practice</h3>
+    <p>
+      How does my crawler contrast against textbook solutions like the one in Evan King's <a href="https://www.hellointerview.com/learn/system-design/problem-breakdowns/web-crawler">HelloInterview analysis</a>? 
+      The metric of interest here is probably King's “hand-wavy” estimate that 5 machines can crawl 10 billion pages in 5 days. In this claim, the machines are completely dedicated to fetching, with 
+      the parsers and frontier datastore living elsewhere. There are no details on the hardware of each machine besides assuming a 400Gbps bandwidth per-machine from which we achieve 30% utilization. 
+    </p>
+    <p>
+      The utilization at least is about right; my nodes offered only 25Gbps, but I indeed got about 32% utilization with 8Gbps in + out at steady state. That said, I only dedicated 9/16 cores on each 
+      machine to fetching, which using naive scaling suggests I could've achieved 53% network utilization. Similarly, since I used 12 machines to crawl 1 billion pages in ~1 day, I likely could have 
+      achieved the same 1 billion per day throughput with 6.75 fetcher-only machines. If we assume straightforward scaling from <code>i7i.4xlarge</code> to <code>i7i.8xlarge</code> as well, this implies 6.75 double-size 
+      fetcher-only machines could crawl 10 billion pages in 5 days. So King's number is not too far off, but might require a bit more optimization than I did with my system!
+    </p>
+    <h3 id="section-4.2">What now?</h3>
+    <p>
+      To be honest I'm surprised so much of the web is still accessible<dt-fn>In the sense that it can be found via anchor tags, not accessible in the UX sense.</dt-fn> without running JS. It's great! I found out about some cool websites like <a href="http://ancientfaces.com">ancientfaces.com</a> through 
+      this crawl. But I noticed that even for many crawl-able websites like GitHub, the downloaded pages didn't really have meaningfully marked-up text content; it was all embedded in gigantic 
+      strings which presumably were to be rendered client-side by what we might consider “lightweight” JS scripts. I think interesting future work would involve addressing this elephant: 
+      how does large-scale crawling look like when we actually need to render pages dynamically? I think suspect the same scale will be much more expensive.
+    </p>
+    <p>
+      Another question is: what is the shape and distribution of the billion pages I crawled look like? I kept a sample but haven't gotten the time to run any analytics. It will be interesting to 
+      know some basic facts about metadata, such as how many crawled URLs were actually alive vs. dead, how many were of an HTML content type vs. multimedia, etc.
+    </p>
+  </dt-article>
+
+  <dt-appendix>
+    <p>
+      <!-- Thanks to Thariq Shihipar, Jonathan Chan, and Luciano Vinas for reading and giving feedback. -->
+    </p>
+    <h3 id="appendix">Appendix</h3>
+    <p></p>
+  </dt-appendix>
+
+  <script type="text/bibliography">
+    @misc{nielsen2012crawl,
+        author = {Nielsen, Michael},
+        title = {How to crawl a quarter billion webpages in 40 hours},
+        url = {https://michaelnielsen.org/ddi/how-to-crawl-a-quarter-billion-webpages-in-40-hours/},
+        year = {2012}
+    }
+    @misc{callan2009sapphire,
+      author = {Callan, Jamie},
+      title = {The Sapphire Web Crawler},
+      url = {https://boston.lti.cs.cmu.edu/crawler/index.html},
+      year = {2009}
+  }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      renderMathInElement(document.body);
+    });
+    const toc = document.getElementById("toc");
+    const sections = document.querySelectorAll(`[id^=section-]`);
+    for (let section of sections) {
+      const h = section.tagName;
+      const title = section.textContent;
+      const id = section.id;
+      const a = document.createElement("a");
+      a.href = `#${id}`;
+      a.textContent = title;
+      const li = document.createElement("li");
+      li.classList.add(`toc-${h}`);
+      for (let i = 0; i < id.length; i++) {
+          if (id[i] === ".") {
+              const tab = document.createElement("span");
+              tab.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+              li.appendChild(tab);
+          }
+      }
+      li.appendChild(a);
+      toc.appendChild(li);
+    }
+  </script>
+</toyb-post>
