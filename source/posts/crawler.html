@@ -60,10 +60,6 @@
     <h1>Crawling a billion web pages in just over 24 hours, in 2025</h1>
     <h2></h2>
     <dt-byline></dt-byline>
-    <!-- <ul class="caption">
-      <li><i>Source code for this article on <a href="https://github.com/andrewkchan/yalm">GitHub</a>.</i></li>
-      <li><i>Discussion on <a href="https://news.ycombinator.com/item?id=42417857">Hacker News</a>.</i></li>
-    </ul> -->
     <p>
       For some reason, nobody's written about what it takes to crawl a big chunk of the web in a while: the last point of reference I saw was Michael Nielsen's post from 2012<dt-cite key="nielsen2012crawl"></dt-cite>.
     </p>
@@ -71,7 +67,7 @@
       Obviously lots of things have changed since then. Most bigger, better, faster: CPUs have gotten a lot more cores, spinning disks have been replaced by NVMe solid state drives with near-RAM 
       I/O bandwidth, network pipe widths have exploded, EC2 has gone from a tasting menu of instance types to a whole rolodex's worth, yada yada. But some harder: much more of the web is dynamic, 
       with heavier content too. How has the state of the art changed? Have the bottlenecks shifted, and would it still cost <a href="https://news.ycombinator.com/item?id=17461384">~$41k to bootstrap your own Google</a>? 
-      I wanted to find out, so I built and ran my own web crawler under similar constraints.
+      I wanted to find out, so I built and ran my own web crawler<dt-fn>I discussed with Michael Nielsen over email and also decided to hold off on publishing the code. Sorry!</dt-fn> under similar constraints.
     </p>
     <dt-byline></dt-byline>
     <h1 id="section-1">Problem statement</h1>
