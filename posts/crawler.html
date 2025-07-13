@@ -113,7 +113,7 @@
     </p>
     <p>
       <b>Politeness</b>. This is super important! I've read a couple stories (<a href="https://drewdevault.com/2025/03/17/2025-03-17-Stop-externalizing-your-costs-on-me.html">example</a>) about how much 
-      pain is caused to admins by massive web crawls that don't respect robots.txt, spoof other agents to evade blocks, and relentlessly hammer endpoints. I followed the same rules as Nielsen: I adhered 
+      pain is caused to admins by massive web crawls that don't respect robots.txt, spoof other agents to evade blocks, and relentlessly hammer endpoints. I followed prior art: I adhered 
       to robots.txt, added an informative user agent containing my contact information, maintained a list of excluded domains which I would add to on request, stuck to my seed list of the top 1 million 
       domains to avoid hitting mom-and-pop sites, and enforced a 70 second minimum delay between hitting the same domain.
     </p>
@@ -137,27 +137,27 @@
         </li>
       </ul>
     <p></p>
-    <img src="./crawler-assets/crawler-design.png" alt="Crawler design" class="l-middle" style="width: min(90vw, 800px)">
+    <img src="./crawler-assets/crawler-design.png" alt="Crawler design" class="l-middle" style="width: min(90vw, 800px);">
     <p>
       In detail, each node consisted of the following:
       </p><ul class="compact-li">
         <li>
           <p>
-            <b>A single Redis instance</b> storing data structures representing the crawl state:
+            <b>A single redis instance</b> storing data structures representing the crawl state:
             </p><ul class="compact-li">
               <li>
                 <b>Per-domain frontiers</b>, or lists of URLs to crawl
               </li>
               <li>
-                <b>Queue of domains</b> ordered by the next timestamp at which they could be fetched based on their crawl delay (so that all domains ready to be fetched would be at the head of the queue)
+                <b>Queue of domains</b> ordered by the next timestamp at which they could be fetched based on their crawl delay<dt-fn>E.g. the delay between hits of a domain to avoid DDOSing it.</dt-fn>
               </li>
               <li>
-                <b>Entries for all visited URLs</b>, with each URL associated with some metadata and path to the saved content on disk (if the fetch successfully retrieved text content)
+                <b>Entries for all visited URLs</b>, with each URL associated with some metadata and path to the saved content<dt-fn>If the fetch successfully retrieved text content.</dt-fn> on disk
               </li>
               <li>
                 <b>Seen URLs bloom filter</b> so that we could quickly determine whether a URL had been added the frontier already. This was separate from the visited entries because we didn't want to add 
-                a URL to a frontier if it was already there (but not yet fetched). The small probability of the bloom filter giving false positives (incorrectly saying that a URL has been seen already when 
-                it hasn't) was fine because again, I'd decided my crawl was a sample of the internet, and I was optimizing for speed.
+                a URL to a frontier if it was already there, but not yet fetched. The small probability of the bloom filter giving false positives<dt-fn>E.g. incorrectly saying that a URL has been seen already when 
+                it hasn't.</dt-fn> was fine because again, I'd decided my crawl was a sample of the internet, and I was optimizing for speed.
               </li>
               <li>
                 <b>Domain metadata</b>, including whether a domain was manually excluded, part of the original seed list, and the full content of its robots.txt (+ robots expiration timestamp).
@@ -179,7 +179,7 @@
               <li>
                 Each process packed high concurrency onto a single core via asyncio; I empirically found fetchers could support 6000-7000 “workers” (independent asynchronous fetch loop). Note this didn't come 
                 close to saturating network bandwidth: the bottleneck was the CPU, which I'll go into later. The async design is a form of user-space multitasking and has been popular for a while for high 
-                concurrency systems (Python Tornado came out in 2009!) because it avoids context switching entirely.
+                concurrency systems (<a href="https://en.wikipedia.org/wiki/Tornado_(web_server)">Python Tornado</a> came out in 2009!) because it avoids context switching entirely.
               </li>
               <li>
                 Both fetchers and parsers also maintained LRU caches of important domain data such as robots.txt content so as to minimize load on redis.
@@ -205,8 +205,8 @@
             </p><ul class="compact-li">
               <li>
                 For persistent storage, I followed prior art and used instance storage. The textbook interview solution will tell you to use S3; I considered this, but S3 charges per-request as well as 
-                pro-rated GB-months, and holding 1 billion pages assuming 250KB per page (250TB total) for just a single day would've cost <code>0.022*1000*250*(1/30)+0.005*1e6 = 5183.33</code> with the standard tier 
-                or <code>0.11*1000*250*(1/30)+0.00113*1e6 = 2046.67</code> with express - an order of magnitude over what I ended up spending! Even ignoring all PUT costs, it would've been $183.33 at standard or $916.67 
+                pro-rated GB-months, and holding 1 billion pages assuming 250KB per page (250TB total) for just a single day would've cost <code>0.022*1000*250*(1/30)+0.005*1e6</code> = $5183.33 with the standard tier 
+                or <code>0.11*1000*250*(1/30)+0.00113*1e6</code> = $2046.67 with express - an order of magnitude over what I ended up spending! Even ignoring all PUT costs, it would've been $183.33 at standard or $916.67 
                 at express to hold my data for a day, meaning even if I'd batched pages together it wouldn't have been competitive.
               </li>
               <li>
@@ -241,10 +241,21 @@
     </p>
     <h3 id="section-2.1">Alternatives investigated</h3>
     <p>
-      Before ending on the design above, I tried pretty hard to make vertically scaling a single node work; I was optimistic about this because so many of the hardware bottlenecks that had 
+      I went through a few different designs before ending up with the one above. It seems like most recent crawlers<dt-cite key="nielsen2012crawl"></dt-cite><dt-cite key="scrapy"></dt-cite><dt-cite key="frontera"></dt-cite> 
+      use a fast in-memory datastore like Redis, and for good reason. I made small-scale 
+      prototypes with SQLite and PostgreSQL backends, but making frontier queries fast was overly complex despite the conceptual simplicity of the data structure.
+    </p>
+    <p>
+      I also tried pretty hard to make vertically scaling a single node work; I was optimistic about this because so many of the hardware bottlenecks that had 
       restricted past big crawls<dt-cite key="nielsen2012crawl"></dt-cite><dt-cite key="callan2009sapphire"></dt-cite> to distributed systems seemed to have disappeared. For instance, AWS offers a <code>i7i.48xlarge</code> instance which is essentially just 12 
       <code>i7i.4xlarge</code> machines stuck together. It has quite a bit less network bandwidth (100Gbps instead of 12x25Gbps), but at the throughput needed to hit 1 billion pages in 24 hours, 
       even if every page was 1MB (which wasn't the case), I'd only be using <code>8*1e6*(1e9/86400)=92Gbps</code>, with room leftover for outbound (which certainly wasn't 1MB per request!).
+    </p>
+    <p>
+      The first large-scale design I tried packed everything onto a single <code>i7i.48xlarge</code>, organizing processes into “pods” which looked a lot like the nodes in my final cluster (groups of 16 processes with a 
+      single redis instance), but with cross-communication allowed. A second design removed the cross-communication and just ran independent pods; a large run with this yielded disappointing results 
+      (the entire system managed only 1k pages/sec, which was only a bit over the throughput of a single node in the final cluster). I ran out of my timebox, so gave up and moved to horizontal scaling. 
+      I suspect the limiting factor may be more software (operating system resources) rather than hardware.
     </p>
     
     <h2 id="section-3">Learnings</h2>
@@ -270,7 +281,7 @@
         </li>
         <li>
           I also truncated page content to 250KB before passing it to the parser. Since the truncation threshold is above the mean and nearly double the median, I think the rationale from 
-          Nielsen still holds: we're capturing most web pages in their entirety, which should be enough for most applications.
+          Nielsen<dt-cite key="nielsen2012crawl"></dt-cite> still holds: we're capturing most web pages in their entirety, which should be enough for most applications.
         </li>
       </ul>
     <p></p>
@@ -281,7 +292,7 @@
     <p>
       Many treatments of crawling take network bandwidth and DNS to be important bottlenecks. For instance, while researching this topic I emailed <a href="https://www.cs.cmu.edu/~callan/">Jamie Callan</a> 
       from CMU about the Sapphire project from 2009<dt-cite key="callan2009sapphire"></dt-cite>; Professor Callan told me that DNS resolution throughput was a bottleneck, and for a later crawl in 
-      2012 which used the CMU campus network, the crawl throughput had to be throttled to avoid using all of the bandwidth. A <a href="https://www.hellointerview.com/learn/system-design/problem-breakdowns/web-crawler">HelloInterview analysis</a> 
+      2012 which used the CMU campus network, the crawl throughput had to be throttled to avoid using all of the bandwidth. This <a href="https://www.hellointerview.com/learn/system-design/problem-breakdowns/web-crawler">interview analysis from Evan King</a> 
       from about a year ago also suggests optimizations for DNS resolution.
     </p>
     <p>
@@ -294,15 +305,15 @@
       expensive function call, taking up a whopping 25% of all CPU time on average, which - given that we weren't near saturating the network pipes, meant fetching became bottlenecked by the CPU 
       before the network!
     </p>
-    <img src="./crawler-assets/ssl.png" alt="SSL growth" class="l-middle" style="width: min(90vw, 800px)">
+    <img src="./crawler-assets/ssl.png" alt="SSL growth" class="l-middle" style="width: min(90vw, 800px);">
     <p class="caption">
       <i>
         From <a href="https://letsencrypt.org/stats/">https://letsencrypt.org/stats/</a> - SSL loads in Firefox have gone from 30% in 2014 to &gt;80% in 2025.
       </i>
     </p>
     <h3 id="section-3.3">The big crawl</h3>
-    <img src="./crawler-assets/shard6-metrics1.png" alt="Metrics for a node early in the crawl" class="l-middle" style="width: min(90vw, 800px)">
-    <img src="./crawler-assets/shard6-metrics2.png" alt="Metrics for a node early in the crawl" class="l-middle" style="width: min(90vw, 800px)">
+    <img src="./crawler-assets/shard6-metrics1.png" alt="Metrics for a node early in the crawl" class="l-middle" style="width: min(90vw, 800px);">
+    <img src="./crawler-assets/shard6-metrics2.png" alt="Metrics for a node early in the crawl" class="l-middle" style="width: min(90vw, 800px);">
     <p class="caption">
       <i>
         Metrics for one of the nodes early on in the crawl. Some of the units in the grafana dashboard are wrong (e.g. error rate and parse queue size are using “bytes” by mistake)
@@ -344,20 +355,19 @@
       To be honest I'm surprised so much of the web is still accessible<dt-fn>In the sense that it can be found via anchor tags, not accessible in the UX sense.</dt-fn> without running JS. It's great! I found out about some cool websites like <a href="http://ancientfaces.com">ancientfaces.com</a> through 
       this crawl. But I noticed that even for many crawl-able websites like GitHub, the downloaded pages didn't really have meaningfully marked-up text content; it was all embedded in gigantic 
       strings which presumably were to be rendered client-side by what we might consider “lightweight” JS scripts. I think interesting future work would involve addressing this elephant: 
-      how does large-scale crawling look like when we actually need to render pages dynamically? I think suspect the same scale will be much more expensive.
+      how does large-scale crawling look like when we actually need to render pages dynamically? I suspect the same scale will be much more expensive.
     </p>
     <p>
-      Another question is: what is the shape and distribution of the billion pages I crawled look like? I kept a sample but haven't gotten the time to run any analytics. It will be interesting to 
+      Another question is: what do the shape and distribution of the billion pages I crawled look like? I kept a sample but haven't gotten the time to run any analytics. It will be interesting to 
       know some basic facts about metadata, such as how many crawled URLs were actually alive vs. dead, how many were of an HTML content type vs. multimedia, etc.
     </p>
   </dt-article>
 
   <dt-appendix>
+    <h3>Acknowledgements</h3>
     <p>
-      <!-- Thanks to Thariq Shihipar, Jonathan Chan, and Luciano Vinas for reading and giving feedback. -->
+      Thanks to Michael Nielsen and Jamie Callan for past projects inspiring this one and for discussion over email, and to Sawyer Hood and Jonathan Chan for helpful feedback on this post.
     </p>
-    <h3 id="appendix">Appendix</h3>
-    <p></p>
   </dt-appendix>
 
   <script type="text/bibliography">
@@ -368,11 +378,23 @@
         year = {2012}
     }
     @misc{callan2009sapphire,
-      author = {Callan, Jamie},
-      title = {The Sapphire Web Crawler},
-      url = {https://boston.lti.cs.cmu.edu/crawler/index.html},
-      year = {2009}
-  }
+        author = {Callan, Jamie},
+        title = {The Sapphire Web Crawler},
+        url = {https://boston.lti.cs.cmu.edu/crawler/index.html},
+        year = {2009}
+    }
+    @misc{frontera,
+        author = {scrapinghub},
+        title = {Frontera},
+        url = {https://github.com/scrapinghub/frontera},
+        year = {2015}
+    }
+    @misc{scrapy,
+        author = {scrapy},
+        title = {Scrapy},
+        url = {https://github.com/scrapy/scrapy},
+        year = {2015}
+    }
   </script>
   <script defer="" src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
   <script>
