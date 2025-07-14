@@ -67,7 +67,7 @@
       Obviously lots of things have changed since then. Most bigger, better, faster: CPUs have gotten a lot more cores, spinning disks have been replaced by NVMe solid state drives with near-RAM 
       I/O bandwidth, network pipe widths have exploded, EC2 has gone from a tasting menu of instance types to a whole rolodex's worth, yada yada. But some harder: much more of the web is dynamic, 
       with heavier content too. How has the state of the art changed? Have the bottlenecks shifted, and would it still cost <a href="https://news.ycombinator.com/item?id=17461384">~$41k to bootstrap your own Google</a>? 
-      I wanted to find out, so I built and ran my own web crawler<dt-fn>I discussed with Michael Nielsen over email and also decided to hold off on publishing the code. Sorry!</dt-fn> under similar constraints.
+      I wanted to find out, so I built and ran my own web crawler<dt-fn>I discussed with Michael Nielsen over email and following precedent, also decided to hold off on publishing the code. Sorry!</dt-fn> under similar constraints.
     </p>
     <dt-byline></dt-byline>
     <h1 id="section-1">Problem statement</h1>
@@ -217,8 +217,8 @@
     <h3 id="section-2.1">Alternatives investigated</h3>
     <p>
       I went through a few different designs before ending up with the one above. It seems like most recent crawlers<dt-cite key="nielsen2012crawl"></dt-cite><dt-cite key="scrapy"></dt-cite><dt-cite key="frontera"></dt-cite> 
-      use a fast in-memory datastore like Redis, and for good reason. I made small-scale 
-      prototypes with SQLite and PostgreSQL backends, but making frontier queries fast was overly complex despite the conceptual simplicity of the data structure.
+      use a fast in-memory datastore like Redis, and for good reason. I made small-scale prototypes with SQLite and PostgreSQL backends, but making frontier queries fast was overly complex despite the conceptual 
+      simplicity of the data structure. AI coding tools helped with this exploration a lot; I'll write about this in another blog post.
     </p>
     <p>
       I also tried pretty hard to make vertically scaling a single node work; I was optimistic about this because so many of the hardware bottlenecks that had 
