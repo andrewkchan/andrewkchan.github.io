@@ -106,7 +106,7 @@
       and 💬 <a href="https://github.com/andrewkchan/crawler-transcripts">links to some chatlogs</a>.
     </p>
     <p>
-      <b>Spoiler</b>: it was a huge boost overall. I'll argue that the learnings apply when building other high-performance systems of the above shape, with some caveats.
+      <b>Spoiler</b>: it was a huge boost overall. I'll argue that the learnings apply when building similiar high-performance systems, with some caveats.
     </p>
     <dt-byline></dt-byline>
     <h2 id="section-1">1. My setup</h2>
@@ -306,7 +306,7 @@ except:
       </ul>
     <p></p>
     <p>
-      In parallel programming, we use the more precise language of <a href="https://jax-ml.github.io/scaling-book/roofline/">“boundedness”</a>: communication and computation happen on separate threads, 
+      In parallel programming, we use the more precise language of <a href="https://jax-ml.github.io/scaling-book/roofline/">“boundedness”</a>: communication and computation happen concurrently, 
       and even if they can be perfectly overlapped, an operation must wait for (”is bound by”) the longer of the two to finish. 
     </p>
     <p>
@@ -414,11 +414,7 @@ except:
       </p><ul class="compact-li">
         <li>
           💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-13_cursor_rethinking_web_crawler_architect_c4opus.md#task-list-for-migration">Writing a rearchitecture plan that assumes tasks take multiple days</a>, 
-          inserting unnecessary checks like performance benchmarks in the middle to make sure work is worth continuing.
-        </li>
-        <li>
-          Since iteration speed is so much faster with agentic coding, plans should really be adapted for agents. For example, intermediate benchmarks and tests can be skipped or deferred until the very end 
-          since large changes which would take humans a day or two instead take an agent minutes. I expect this to be fixed very soon.
+          inserting unnecessary checks like performance benchmarks in the middle to make sure work is worth continuing. This is despite the fact that large changes which would take humans hours or days often take an agent minutes.
         </li>
       </ul>
     <p></p>
