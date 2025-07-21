@@ -85,10 +85,10 @@
       and 💬 <a href="https://github.com/andrewkchan/crawler-transcripts">links to some chatlogs</a>.
     </p>
     <p>
-      Spoiler: it was a huge boost overall. I'll argue that the learnings apply when building other high-performance systems of the above shape, with some caveats.
+      <b>Spoiler</b>: it was a huge boost overall. I'll argue that the learnings apply when building other high-performance systems of the above shape, with some caveats.
     </p>
     <dt-byline></dt-byline>
-    <h1 id="section-1">My setup</h1>
+    <h2 id="section-1">1. My setup</h1>
     <p>
       I used Cursor, just the IDE and chat in agent mode. No background agents (which were early preview when I started). Somehow this has become boring: Steve Yegge calls it 
       <a href="https://sourcegraph.com/blog/revenge-of-the-junior-developer">“chat coding”</a> and says it'll be ancient history by Q3. I stuck with it because:
@@ -158,7 +158,7 @@ Total lines changed: 1253
       this up by parallelizing with background agents or worktrees, but for reasons I'll describe, my problem was ultimately still bottlenecked by code review and experiments: I estimate I 
       could've shaved a week of part-time work off.
     </p>
-    <h1 id="section-2">The problem</h1>
+    <h2 id="section-2">2. The problem</h1>
     <p>
       The shape of the problem you're trying to solve will determine exactly how much AI helps you, because it will imply:
       <ul class="compact-li">
@@ -177,7 +177,7 @@ Total lines changed: 1253
         <li><b>Some bugs are really bad at scale</b>: Not respecting politeness, requesting the same URL twice, etc.</li>
       </ul>
     </p>
-    <h1 id="section-3">Vibe code, manual review</h1>
+    <h2 id="section-3">3. Vibe code, manual review</h1>
     <p>
       The bug risk meant pure vibe coding was not an option. If I didn't respect a crawl delay or allowed URLs to be visited twice, I could've easily ended up 
       <a href="https://drewdevault.com/2025/03/17/2025-03-17-Stop-externalizing-your-costs-on-me.html">harming site owners</a> when running my crawl at scale. Full coverage via automated tests 
@@ -204,9 +204,12 @@ Total lines changed: 1253
           Another design used a redis bloom filter, but 💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-14_cursor_start_phase_2_of_redis_rearchite_c4opus.md">Claude's first attempt</a> 
           at this had totally broken initialization code for the bloom filter. Below, the problem isn't just that <code>exists</code> is never used, but also that the bloom filter creation assumes <code>BF.EXISTS</code> raises 
           an exception if the key doesn't exist, which it doesn't:
-          <!-- <dt-code block language="python"> -->
-            <pre class="l-middle">
-              <code class="language-python">
+        </li>
+      </ul>
+    </p>
+    <!-- <dt-code block language="python"> -->
+      <pre class="l-middle">
+        <code class="language-python">
 try:
     # Check if bloom filter exists
     exists = await self.redis.execute_command('BF.EXISTS', 'seen:bloom', 'test')
@@ -221,12 +224,9 @@ except:
         logger.info("Created new bloom filter for 10M URLs with 0.1% FPR")
     except:
         logger.warning("Could not create bloom filter - it may already exist")
-                  </code>
-              </pre>
-          <!-- </dt-code> -->
-        </li>
-      </ul>
-    </p>
+            </code>
+        </pre>
+    <!-- </dt-code> -->
     <p>
       Some of these I caught in spot checks, but others weren't obvious until I dug a bit deeper in code review.
     </p>
@@ -241,7 +241,7 @@ except:
       for all the right API calls and read tutorials and best practices on implementing the patterns I wanted, I could just ask for a complete algorithm without knowing the keywords, and lookup relevant 
       calls as I read them<dt-fn>I did need to know SQL to be able to audit and debug the code that Claude wrote, like the mistake above. So it's not true that syntax became totally irrelevant.</dt-fn>. 
     </p>
-    <h1 id="section-4">Rapidly exploring the design space</h1>
+    <h2 id="section-4">4. Rapidly exploring the design space</h1>
     <p>
       In the past, if I needed to build a performant system that could use a variety of technologies and designs, the research phase would go something like this:
       <ol class="compact-li">
@@ -272,10 +272,12 @@ except:
     </p>
     <p>
       I did this without being an expert in the technologies used. Of course, that meant I didn't have the sense to start with a good design; in hindsight, the early designs I tried were really stupid. 
-      But that didn't matter, because I had an <i>objective signal telling me how good my system was, and rewriting it was really cheap</i>. Reading blogs, thinking a lot, and coming up with good ideas was 
-      still important, but I could do it in an agile manner - e.g. while I was experimenting rather than ahead-of-time!
+      But that didn't matter, because I had an <i>objective signal</i> telling me how good my system was, and rewriting it was <i>really cheap</i>.
     </p>
-    <h1 id="section-5">Coding-bound vs. experiment-bound</h1>
+    <p>
+      Reading blogs, thinking a lot, and coming up with good ideas was still important, but I could do it in an agile manner - e.g. while I was experimenting rather than ahead-of-time!
+    </p>
+    <h2 id="section-5">5. Coding-bound vs. experiment-bound</h1>
     <p>
       There's this notion floating around recently that “coding was never the bottleneck in software”. I think the statement taken at face value is clearly false in many contexts. From my time at Figma, 
       the <a href="https://www.figma.com/blog/building-a-professional-design-tool-on-the-web/">original Figma editor</a> is a great example where the ability of the founding team to implement various 
@@ -296,7 +298,7 @@ except:
     <p>
       Teams that understand this will crush teams that don't.
     </p>
-    <h1 id="section-6">Superhuman taste</h1>
+    <h2 id="section-6">6. Superhuman taste</h1>
     <p>
       AI helped me rapidly prototype solutions in the design space. Did it also help with pruning points in that space, e.g. did it have human-level systems taste? Again, this will be highly domain-dependent. 
       There are some studies showing that LLMs have superhuman taste in some areas, e.g. <a href="https://arxiv.org/abs/2403.03230">predicting neuroscience experiment outcomes better than humans</a>, 
@@ -322,7 +324,7 @@ except:
         </li>
       </ul>
     </p>
-    <h1 id="section-7">Pair programmer in the machine</h1>
+    <h2 id="section-7">7. Pair programmer in the machine</h1>
     <p>
       Yes, sometimes agents are like overeager interns that haven't learned the conventions of a codebase and don't know when to say “I don't know”. But the enormous compressed experience they have in domains that they're 
       competent in can be incredibly powerful. For example, they can substitute for a senior engineer's expertise in:
@@ -344,9 +346,11 @@ except:
           <b>Working with hexdumps and binary files.</b>
           <ul class="compact-li">
             <li>
-              💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-29_cursor_finding_redis_server_data_snapsh_c4opus.md">Claude helping me recover a corrupted redis dump</a>. 
-              The transcript unfortunately doesn't include the terminal commands the agent ran. See my twitter thread for some screenshots:
-              <img src="./crawler-assets/hexdump.png" alt="Claude reading hexdump of corrupted redis file" class="l-middle" style="width: min(90vw, 400px);" />
+              <p>
+                💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-29_cursor_finding_redis_server_data_snapsh_c4opus.md">Claude helping me recover a corrupted redis dump</a>. 
+                The transcript unfortunately doesn't include the terminal commands the agent ran. See my <a href="https://x.com/andrew_k_chan/status/1939797658341913087">twitter thread</a> for more:
+              </p>
+              <img src="./crawler-assets/hexdump.png" alt="Claude reading hexdump of corrupted redis file" style="width: min(90vw, 400px);" />
             </li>
           </ul>
         </li>
@@ -368,7 +372,7 @@ except:
         </li>
       </ul>
     </p>
-    <h1 id="section-8">Vibe-coded metrics and visualizations</h1>
+    <h2 id="section-8">8. Vibe-coded metrics and visualizations</h1>
     <p>
       Side functionality where bugs are low impact are a perfect use case for vibe-coding. <a href="https://x.com/geoffreylitt/status/1925565496964812937">Geoffrey Litt</a> has a great tweet about this. 
       💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-10_cursor_integrating_metrics_collection_a_c4opus.md">All of my dashboards and 99% of my instrumentation were vibe-coded</a>:
@@ -386,7 +390,7 @@ except:
         or integrate them into my application. Open to suggestions too. Let's discuss before coding
       </i>
     </p>
-    <h1 id="section-9">Agents don't have a sense of time</h1>
+    <h2 id="section-9">9. Agents don't have a sense of time</h1>
     <p>
       Agents still plan timelines like humans...
       <ul class="compact-li">
@@ -407,7 +411,7 @@ except:
         <li>💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-29_cursor_finding_redis_server_data_snapsh_c4opus.md#rdb-format-analysis">Running a terminal command to truncate a file</a> by copying it byte-by-byte (using <code>dd</code> with <code>bs=1</code>) instead of in chunks to the truncation point (<code>head -c</code>).</li>
       </ul>
     </p>
-    <h1 id="section-10">Context, context, context</h1>
+    <h2 id="section-10">10. Context, context, context</h1>
     <p>
       Lack of continual learning and limited context are fundamental constraints of LLMs today, and I would regularly see small breaks in the model's map of the territory like 
       💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-13_cursor_rethinking_web_crawler_architect_c4opus.md#if-you-do-choose-redis">advising me to use redis cluster</a> 
@@ -437,7 +441,7 @@ except:
         </p>
       </i>
     </div>
-    <h1 id="section-11">Slop is the enemy of performance</h1>
+    <h2 id="section-11">11. Slop is the enemy of performance</h1>
     <p>
       Earlier, I mentioned a pernicious problem: logically correct but redundant slop causing performance issues. Some examples to ground the impact:
       <ul class="compact-li">
@@ -476,7 +480,7 @@ except:
     <p>
       Some of the above issues stem from my use of a dynamic language and imperfect coverage of linters, which I expect will be much improved soon. Others such as the redundant “clean HTML” and unused redis fields are more difficult to avoid.
     </p>
-    <h1 id="section-12">Conclusion</h1>
+    <h2 id="section-12">12. Conclusion</h1>
     <p>
       This post was originally titled “Moving up the stack with AI.” In hindsight that would've been a terrible title. <i>Obviously</i> AI lets us be more ambitious and ship whole apps where we previously 
       would've had small scripts. But I started this whole thing because as a performance person who's always taken <a href="https://fly.io/blog/youre-all-nuts/#:~:text=the%20same%20argument.-,but%20the%20craft,-Do%20you%20like">pride in the craft</a>, 
