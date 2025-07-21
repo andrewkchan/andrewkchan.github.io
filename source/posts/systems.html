@@ -1,0 +1,531 @@
+<toyb-post>
+  <toyb-title>Vibecoding a high performance system</toyb-title>
+  <toyb-date>July 20 2025</toyb-date>
+  <toyb-draft></toyb-draft>
+  <toyb-head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.css" integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.js" integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx" crossorigin="anonymous"></script>
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-HYB0C59DXR"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-HYB0C59DXR');
+    </script>
+
+    <script type="text/front-matter">
+      title: "Vibecoding a high performance system"
+      published: July 20, 2025
+      description: ""
+      authors:
+      - Andrew Chan: http://andrewkchan.github.io
+      affiliations:
+      -
+    </script>
+
+    <style>
+      .compact-li li {
+        margin-bottom: 0.5em;
+      }
+      .caption {
+        font-size: 15px;
+        line-height: 1.3em;
+      }
+      #toc {
+          line-height: 0.3em;
+          width: calc(984px - 648px);
+      }
+      @media (min-width: 1280px) {
+          #toc {
+              margin-right: 72px;
+              position: sticky; 
+              top: 72px;
+              z-index: 2;
+          }
+      }
+      #toc > li {
+          list-style-type: none;
+      }
+      .l-gutter {
+          position: relative;
+          background-color: white;
+      }
+    </style>
+  </toyb-head>
+  <dt-article>
+    <div class="l-gutter caption" id="toc"><h4>Contents</h4></div>
+    <h1>Vibecoding a high performance system</h1>
+    <h2></h2>
+    <dt-byline></dt-byline>
+    <!-- <ul class="caption">
+      <li>
+        <i>Discussion on <a href="https://www.reddit.com/r/programming/comments/1m1hvh3/crawling_a_billion_web_pages_in_just_over_24/">r/programming</a>.</i>
+      </li>
+    </ul> -->
+    <p>
+      There's been a thousand posts about vibe coding already, from <a href="https://www.indragie.com/blog/i-shipped-a-macos-app-built-entirely-by-claude-code">Indragie Karunaratne</a> shipping the 
+      Context app on the Mac to <a href="https://blog.ezyang.com/2025/06/vibe-coding-case-study-scubaduck/">Edward Yang</a> making ScubaDuck to <a href="https://news.ycombinator.com/item?id=44159166">Cloudflare</a> 
+      building OAuth with Claude. These are all projects where it's something the creator is already an expert in, or a read-only app where bugs are low-impact, or a well-known standard with a small 
+      design space.
+    </p>
+    <p>
+      I recently used agentic coding to help build a <a href="https://andrewkchan.dev/posts/crawler.html">system to crawl a billion web pages in around 24 hours</a>. Here's what's different:
+      <ul class="compact-li">
+        <li>The core concept is simple, but at scale, the design space is large.</li>
+        <li>There are parts where bugs could be really bad, like politeness.</li>
+        <li>The goal was to achieve a new level of an objective metric (throughput).</li>
+      </ul>
+    </p>
+    <p>
+      I wrote &lt;4% of the code by hand. This post is all about how it helped and how it fell short. I'll attach code snippets<dt-fn>I'm respecting Michael Nielsen's precedent and holding off on releasing 
+      the whole repository. I'll be open-sourcing a subset of the prompts instead. Yes, I know this hurts the epistemics of my argument. You'll just have to trust me that the system works and was built as advertised.</dt-fn> 
+      and 💬 <a href="https://github.com/andrewkchan/crawler-transcripts">links to some chatlogs</a>.
+    </p>
+    <p>
+      Spoiler: it was a huge boost overall. I'll argue that the learnings apply when building other high-performance systems of the above shape, with some caveats.
+    </p>
+    <dt-byline></dt-byline>
+    <h1 id="section-1">My setup</h1>
+    <p>
+      I used Cursor, just the IDE and chat in agent mode. No background agents (which were early preview when I started). Somehow this has become boring: Steve Yegge calls it 
+      <a href="https://sourcegraph.com/blog/revenge-of-the-junior-developer">“chat coding”</a> and says it'll be ancient history by Q3. I stuck with it because:
+      <ul class="compact-li">
+        <li>I'm the type of programmer who doesn't mess with their tools too often, and prefers to instead go deep on the problems I'm solving.</li>
+        <li>The tab autocomplete is still best-in-class. I found that I needed to stay in touch with the code for many reasons, and tab kept me in the loop while still providing a big boost.</li>
+      </ul>
+    </p>
+    <p>
+      I've tried Claude Code a bit. It's good! I used it to make <a href="https://andrewkchan.dev/pbf-bench/">pbf-bench</a> and my friend Sawyer is building <a href="https://x.com/sawyerhood/status/1938263088836579536">a whole toolchain</a> 
+      on top of it. So far I've felt that it's best for small projects where I don't need to review the code and some terminal tasks. I expect I'll be using it more and more but <i>with</i> Cursor, not <i>instead of</i> Cursor. 
+      Maybe that could change in a year or so.
+    </p>
+    <p>
+      How much did I code with agents vs. handwrite? According to my commit messages, out of 32k lines of code changes in this project...
+    </p>
+    <!-- <dt-code block language="plaintext"> -->
+      <pre class="l-middle">
+        <code class="language-plaintext">
+% claude -p "give me a command or script to count the number of lines changed in .py files over all commits"                                       
+Here's a command to count lines changed in .py files across all commits:
+
+```bash
+git log --numstat --pretty="" -- "*.py" | awk '{add+=$1; del+=$2} END {print "Added lines: " add "\nDeleted lines: " del "\nTotal changes: " add+del}'
+```
+
+This command:
+- Uses `git log --numstat` to get line change statistics
+- Filters for only `.py` files with `-- "*.py"`
+- Uses `awk` to sum up additions and deletions across all commits
+
+% git log --numstat --pretty="" -- "crawler/**/*.py" "crawler/**/*.yml" "crawler/**/*.sh" "crawler/**/*.json" | awk '{add+=$1; del+=$2} END {print "Added lines: " add "\nDeleted lines: " del "\nTotal changes: " add+del}'
+Added lines: 20305
+Deleted lines: 11864
+Total changes: 32169
+            </code>
+        </pre>
+    <!-- </dt-code> -->
+    <p>
+      ...1.2k were handwritten:
+    </p>
+    <!-- <dt-code block language="plaintext"> -->
+      <pre class="l-middle">
+        <code class="language-plaintext">
+% claude -p "give me a command or script to count the number of lines changed in .py files over all commits (filtered to include only commits with '[not vibed]' in the message)"
+Here's a command to count the number of lines changed in .py files for commits with '[not vibed]' in the message:
+
+```bash
+git log --grep='\[not vibed\]' --pretty=format:'%H' | while read commit; do 
+    git diff --numstat "$commit"^ "$commit" -- '*.py' 2>/dev/null | awk '{added+=$1; deleted+=$2} END {print added+deleted}'
+done | awk '{total+=$1} END {print "Total lines changed: " total}'
+```
+
+% git log --grep='\[not vibed\]' --pretty=format:'%H' | while read commit; do 
+    git diff --numstat "$commit"^ "$commit" -- 'crawler/**/*.py' 'crawler/**/*.yml' 'crawler/**/*.sh' 'crawler/**/*.json' 2>/dev/null | awk '{added+=$1; deleted+=$2} END {print added+deleted}'
+done | awk '{total+=$1} END {print "Total lines changed: " total}'
+Total lines changed: 1253
+            </code>
+        </pre>
+    <!-- </dt-code> -->
+    <p>
+      That's 3.75%!
+    </p>
+    <p>
+      I started building the crawler as a side project at the very end of May (first with Gemini 2.5 Pro, then Claude 4 Opus), working for a couple hours each night; working through 8 completely 
+      different designs and running countless experiments took me through the July 4 week, which I took off work to go full-time on this. In retrospect there are totally ways I could've sped 
+      this up by parallelizing with background agents or worktrees, but for reasons I'll describe, my problem was ultimately still bottlenecked by code review and experiments: I estimate I 
+      could've shaved a week of part-time work off.
+    </p>
+    <h1 id="section-2">The problem</h1>
+    <p>
+      The shape of the problem you're trying to solve will determine exactly how much AI helps you, because it will imply:
+      <ul class="compact-li">
+        <li><b>Where the bottlenecks are</b>: Is it writing code, running experiments, or talking to customers?</li>
+        <li><b>The reliability of AI in your domain</b>: for instance, Claude hallucinates a lot more when writing Metal Shader Language than when writing CUDA code.</li>
+        <li><b>The level of supervision needed</b>: this correlates with the severity of bugs, because AIs still write buggy code and likely will do so for a long time. Are you building read-only UIs or pacemaker software?</li>
+      </ul>
+    </p>
+    <p>
+      See <a href="https://andrewkchan.dev/posts/crawler.html">my other blog post</a> for the exact constraints of my web crawler. The interesting parts were:
+      <ul class="compact-li">
+        <li><b>In a new domain</b>: Most of my experience is in real-time C++ and web applications, developer tooling, or GPU kernels. I hadn't worked in-depth with data-intensive systems nor the datastore technologies I ended up using before.</li>
+        <li><b>Design space is large</b>: I'll talk about all the different designs I tried later in this article.</li>
+        <li><b>Long experimental runs</b>: The performance signal during crawler runs was noisy and it took time to reach steady state. Some issues like memory leaks only emerged in overnight runs.</li>
+        <li><b>Resource-constrained</b>: Experiments cost money and I don't have that much!</li>
+        <li><b>Some bugs are really bad at scale</b>: Not respecting politeness, requesting the same URL twice, etc.</li>
+      </ul>
+    </p>
+    <h1 id="section-3">Vibe code, manual review</h1>
+    <p>
+      The bug risk meant pure vibe coding was not an option. If I didn't respect a crawl delay or allowed URLs to be visited twice, I could've easily ended up 
+      <a href="https://drewdevault.com/2025/03/17/2025-03-17-Stop-externalizing-your-costs-on-me.html">harming site owners</a> when running my crawl at scale. Full coverage via automated tests 
+      was also tricky, and the tests that I did write had to be rewritten a few times due to major changes in the technologies used.
+    </p>
+    <p>
+      This meant I had to keep the “realtime tech debt” to acceptable levels by performing frequent spot checks to maintain understanding during a multi-turn feature generation, then reviewing the code 
+      carefully at the end; this allowed recovery when the models would lose context or make mistakes.
+    </p>
+    <p>
+      And they did make mistakes. For example:
+      <ul class="compact-li">
+        <li>
+          A design using a SQL backend had a <code>frontier</code> table with rows corresponding to URLs. To pop from the frontier, you had to set the <code>claimed_at</code> field on a row. Claude's initial 
+          version of this used <code>SELECT FOR UPDATE</code>, but it applied the <code>FOR UPDATE</code> lock to a <code>CTE</code> (temporary table created via <code>WITH</code>) instead of the row in the <code>frontier</code> table. 
+          This led to a 💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-08_cursor_debugging_race_condition_in_craw_c4opus.md">race condition where 2 workers could pop the same URL</a>.
+        </li>
+        <li>
+          A later design had per-domain frontiers without atomic popping operations. To avoid expensive locking, the design sharded the domains across fetcher processes. 
+          💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-30_cursor_rebalancing_web_crawler_processe_c4opus.md">Claude decided to use</a> the Python <code>hash</code> 
+          builtin (which won't give consistent results for the same string input in different processes) rather than a proper hash function to shard domains - which would've broken mutual exclusion.
+        </li>
+        <li>
+          Another design used a redis bloom filter, but 💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-14_cursor_start_phase_2_of_redis_rearchite_c4opus.md">Claude's first attempt</a> 
+          at this had totally broken initialization code for the bloom filter. Below, the problem isn't just that <code>exists</code> is never used, but also that the bloom filter creation assumes <code>BF.EXISTS</code> raises 
+          an exception if the key doesn't exist, which it doesn't:
+          <!-- <dt-code block language="python"> -->
+            <pre class="l-middle">
+              <code class="language-python">
+try:
+    # Check if bloom filter exists
+    exists = await self.redis.execute_command('BF.EXISTS', 'seen:bloom', 'test')
+    logger.info("Bloom filter already exists, using existing filter")
+except:
+    # Create bloom filter for seen URLs
+    # Estimate: visited + frontier + some growth room (default to 10M for new crawls)
+    try:
+        await self.redis.execute_command(
+            'BF.RESERVE', 'seen:bloom', 0.001, 10_000_000
+        )
+        logger.info("Created new bloom filter for 10M URLs with 0.1% FPR")
+    except:
+        logger.warning("Could not create bloom filter - it may already exist")
+                  </code>
+              </pre>
+          <!-- </dt-code> -->
+        </li>
+      </ul>
+    </p>
+    <p>
+      Some of these I caught in spot checks, but others weren't obvious until I dug a bit deeper in code review.
+    </p>
+    <p>
+      The most pernicious were performance issues caused by logically fine but redundant slop and the race condition mentioned above. These were caught and dealt with in much the same way that they might've 
+      been without AI: by running the crawler in small increments after large changes to mitigate risks (cutting it off if anything looked off in the output), inspecting logs and taking profiles, and adding 
+      regression tests afterwards.
+    </p>
+    <p>
+      Was this whole process still faster than typing the code out myself? Yes it was, because much of this project involved APIs and technologies that I had never used before<dt-fn>Yes, it's partly vibes. 
+      But this makes my case very different than the METR study.</dt-fn>! Rather than having to search 
+      for all the right API calls and read tutorials and best practices on implementing the patterns I wanted, I could just ask for a complete algorithm without knowing the keywords, and lookup relevant 
+      calls as I read them<dt-fn>I did need to know SQL to be able to audit and debug the code that Claude wrote, like the mistake above. So it's not true that syntax became totally irrelevant.</dt-fn>. 
+    </p>
+    <h1 id="section-4">Rapidly exploring the design space</h1>
+    <p>
+      In the past, if I needed to build a performant system that could use a variety of technologies and designs, the research phase would go something like this:
+      <ol class="compact-li">
+        <li>I'd read a bunch of blogs or papers about similar problems for ideas.</li>
+        <li>I'd write down solutions and their tradeoffs, then prune the list to a subset that I actually had the time to implement.</li>
+        <li>I'd prototype and benchmark those solutions. If this was costly, I might only be able to try out a few of them.</li>
+      </ol>
+    </p>
+    <p>
+      This could go sideways in all sorts of ways. I might get mired in tutorials for a new technology. Or if this was at work, other priorities might cutoff (3).
+    </p>
+    <p>
+      I think almost everybody does these steps when building performant systems with some tweaks<dt-fn>For example, if you're really smart or your problem is novel enough, you might skip (1). Or maybe 
+      you have such a good intuition that you can always pick the best design and skip the experimentation in (3).</dt-fn>. What agentic coding let me do was skip (2) entirely and make (3) much much cheaper. 
+    </p>
+    <p>
+      For my web crawler, this meant I could prototype 8 major designs, an absurd luxury for a side project done in little over a month of nights and weekends:
+      <ol class="compact-li">
+        <li>💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-05-25_cursor_collaborative_web_crawler_projec.md">Single-process crawler backed by SQLite-based frontier</a> (unmeasured)</li>
+        <li>💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-05-31_cursor_designing_a_new_datastore_for_th_claude4opus.md">Single-process backed by PostgreSQL frontier</a> (20 pages/sec)</li>
+        <li>Single-process backed by hybrid Redis and filesystem frontier (20 pages/sec)</li>
+        <li>4x fetchers, 3x parsers backed by hybrid Redis-filesystem frontier (320 pages/sec)</li>
+        <li>4x fetchers, 3x parsers backed by pure Redis frontier (400 pages/sec)</li>
+        <li>Single-node, 12x pod system with cross-communication (unmeasured)</li>
+        <li>Single-node, 12x pod system without cross-communication (1k pages/sec)</li>
+        <li>12x node, single-pod system (10.8k pages/sec)</li>
+      </ol>
+    </p>
+    <p>
+      I did this without being an expert in the technologies used. Of course, that meant I didn't have the sense to start with a good design; in hindsight, the early designs I tried were really stupid. 
+      But that didn't matter, because I had an <i>objective signal telling me how good my system was, and rewriting it was really cheap</i>. Reading blogs, thinking a lot, and coming up with good ideas was 
+      still important, but I could do it in an agile manner - e.g. while I was experimenting rather than ahead-of-time!
+    </p>
+    <h1 id="section-5">Coding-bound vs. experiment-bound</h1>
+    <p>
+      There's this notion floating around recently that “coding was never the bottleneck in software”. I think the statement taken at face value is clearly false in many contexts. From my time at Figma, 
+      the <a href="https://www.figma.com/blog/building-a-professional-design-tool-on-the-web/">original Figma editor</a> is a great example where the ability of the founding team to implement various 
+      designs across multiple technologies quickly allowed them to rapidly explore the solution space before arriving at the most performant design:
+      <ul class="compact-li">
+        <li>Early on, the app was written in JS but was rewritten to C++ using asm.js.</li>
+        <li>Browser graphics implementations such as HTML and SVG were tried before moving to a custom WebGL-based rendering stack, which involved writing a custom DOM, compositor, and text engine.</li>
+      </ul>
+    </p>
+    <p>
+      In parallel programming, we use the more precise language of <a href="https://jax-ml.github.io/scaling-book/roofline/">“boundedness”</a>: communication and computation happen on separate threads, 
+      and even if they can be perfectly overlapped, an operation must wait for (”is bound by”) the longer of the two to finish. 
+    </p>
+    <p>
+      What's going on here is that many tasks in software engineering are moving from being coding-bounded to communication or experiment-bounded, my crawler being a prime example of the latter. Yet the 
+      outcome depends on not just the task but the team; the technical advantage of early Figma and the like is being democratized, but it's up to teams to recognize these opportunities and execute on them.
+    </p>
+    <p>
+      Teams that understand this will crush teams that don't.
+    </p>
+    <h1 id="section-6">Superhuman taste</h1>
+    <p>
+      AI helped me rapidly prototype solutions in the design space. Did it also help with pruning points in that space, e.g. did it have human-level systems taste? Again, this will be highly domain-dependent. 
+      There are some studies showing that LLMs have superhuman taste in some areas, e.g. <a href="https://arxiv.org/abs/2403.03230">predicting neuroscience experiment outcomes better than humans</a>, 
+      <a href="https://arxiv.org/abs/2506.00794">predicting AI experiment outcomes better than humans</a>. 
+    </p>
+    <p>
+      My experience was more mixed:
+      <ul class="compact-li">
+        <li>
+          💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-05-25_cursor_collaborative_web_crawler_projec.md">Gemini chose a pretty bad initial design</a>: a SQLite backend. 
+          This might've been partially because my initial spec mentioned that the crawler would be “educational,” but the same spec also set an aggressive performance target of 50 million pages in 24 hours 
+          for 1 machine. When I pointed this out and questioned the utility of SQLite, Gemini doubled down. I decided to see where this would take me, but it ended up being a big waste of time due to SQLite's 
+          lack of support for highly concurrent writes.
+        </li>
+        <li>
+          💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-05-31_cursor_optimizing_web_crawler_frontier_claude4opus.md#3-alternative-queue-systems-better-long-term-solution">Opus proposed much better ideas</a> 
+          (un-prompted!) when I asked it about all the problems I was facing with SQLite. In fact, arguably <i>I</i> ended up being more wrong in that discussion, because Opus proposed Redis as a better long-term solution, 
+          but I proposed PostgreSQL instead, which in the end again proved to be a dead-end that I chose to rewrite.
+        </li>
+        <li>
+          I didn't repeat the same question to Gemini, but having gotten a feel for how these models navigate conversations, Opus feels much more like a senior engineer adept at figuring out what I <i>really</i> 
+          wanted and answering the questions that I didn't think to ask.
+        </li>
+      </ul>
+    </p>
+    <h1 id="section-7">Pair programmer in the machine</h1>
+    <p>
+      Yes, sometimes agents are like overeager interns that haven't learned the conventions of a codebase and don't know when to say “I don't know”. But the enormous compressed experience they have in domains that they're 
+      competent in can be incredibly powerful. For example, they can substitute for a senior engineer's expertise in:
+      <ul class="compact-li">
+        <li>
+          <b>Reading profiles.</b>
+          <ul class="compact-li">
+            <li>
+              When profiling, I noticed my python program had a lot of occurrences of a function <code>select</code>. Just searching for "python asyncio select profile" on google didn't really help. 
+            </li>
+            <li>
+              But when 💬 <a href="https://claude.ai/share/80f91af2-0eee-4081-a5e6-18b7f99ebb77">I asked Claude about this</a>, I learned that <code>select</code> is a low-level system call that indicates my program was spending 
+              most of its time waiting for I/O rather than doing CPU intensive work. I understood this to mean that I could squeeze more performance by increasing the number of workers in the crawler 
+              fetcher process, which worked.
+            </li>
+          </ul>
+        </li>
+        <li>
+          <b>Working with hexdumps and binary files.</b>
+          <ul class="compact-li">
+            <li>
+              💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-29_cursor_finding_redis_server_data_snapsh_c4opus.md">Claude helping me recover a corrupted redis dump</a>. 
+              The transcript unfortunately doesn't include the terminal commands the agent ran. See my twitter thread for some screenshots:
+              <img src="./crawler-assets/hexdump.png" alt="Claude reading hexdump of corrupted redis file" class="l-middle" style="width: min(90vw, 400px);" />
+            </li>
+          </ul>
+        </li>
+        <li>
+          <b>Writing performance instrumentation.</b>
+          <ul class="compact-li">
+            <li>💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-29_cursor_diagnosing_memory_issues_in_web_c4opus.md">Adding memory diagnostics using libraries I'd never heard of, such as <code>pympler</code></a>.</li>
+            <li>💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-28_cursor_debugging_file_descriptor_leak_i_c4opus.md">Adding instrumentation to debug a file descriptor leak</a>.</li>
+          </ul>
+        </li>
+        <li>
+          <b>Troubleshooting logs with a trained eye.</b>
+          <ul class="compact-li">
+            <li>
+              💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-29_cursor_debugging_redis_crash_during_cra_c4opus.md">Reading redis logs</a> and flagging that redis was likely OOM killed due a missing 
+              environment setting <code>vm.overcommit_memory = 1</code> as indicated by a line in the logs.
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </p>
+    <h1 id="section-8">Vibe-coded metrics and visualizations</h1>
+    <p>
+      Side functionality where bugs are low impact are a perfect use case for vibe-coding. <a href="https://x.com/geoffreylitt/status/1925565496964812937">Geoffrey Litt</a> has a great tweet about this. 
+      💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-10_cursor_integrating_metrics_collection_a_c4opus.md">All of my dashboards and 99% of my instrumentation were vibe-coded</a>:
+    </p>
+    <img src="./crawler-assets/shard6-metrics1.png" alt="Metrics for a node early in the crawl" class="l-middle" style="width: min(90vw, 800px);" />
+    <p>
+      Again, this was a serious application, so I did review the instrumentation and visualizations. And there were sometimes bugs! For example, the “error” visualizations above mistakenly use a unit 
+      of “bytes” rather than raw counts. But once again, this was much faster than me working through Prometheus and Grafana tutorials and building it all myself. I could even be vague in these prompts:
+    </p>
+    <p style="display: block; background: white; border-left: 3px solid rgba(0, 0, 0, 0.05); padding: 0 0 0 24px; color: rgba(0, 0, 0, 0.7);">
+      <i>
+        Can you help me add proper metrics collection and visualization to my web crawler? Currently metrics are just logged periodically in CrawlerOrchestrator._log_metrics. After each run of the crawler 
+        I then need to filter and parse the logs. Ideally I would be able to have something like a rudimentary DataDog where I can visualize metrics as they appear in real-time, correlate different metrics, 
+        and maybe do some basic aggregations such as smoothing or averaging. I heard some people use Grafana/Prometheus but I'm not sure what exactly those libraries do, how to use them to make dashboards, 
+        or integrate them into my application. Open to suggestions too. Let's discuss before coding
+      </i>
+    </p>
+    <h1 id="section-9">Agents don't have a sense of time</h1>
+    <p>
+      Agents still plan timelines like humans...
+      <ul class="compact-li">
+        <li>
+          💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-13_cursor_rethinking_web_crawler_architect_c4opus.md#task-list-for-migration">Writing a rearchitecture plan that assumes tasks take multiple days</a>, 
+          inserting unnecessary checks like performance benchmarks in the middle to make sure work is worth continuing.
+        </li>
+        <li>
+          Since iteration speed is so much faster with agentic coding, plans should really be adapted for agents. For example, intermediate benchmarks and tests can be skipped or deferred until the very end 
+          since large changes which would take humans a day or two instead take an agent minutes. I expect this to be fixed very soon.
+        </li>
+      </ul>
+    </p>
+    <p>
+      ...but don't perceive time like humans. They'll choose very slow ways to do things, such as:
+      <ul class="compact-li">
+        <li>💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-30_cursor_rebalancing_web_crawler_processe_c4opus.md#2-resharding-logic-in-orchestrator-startup">Writing migration scripts</a> which transform items one-at-a-time instead of in batches.</li>
+        <li>💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-29_cursor_finding_redis_server_data_snapsh_c4opus.md#rdb-format-analysis">Running a terminal command to truncate a file</a> by copying it byte-by-byte (using <code>dd</code> with <code>bs=1</code>) instead of in chunks to the truncation point (<code>head -c</code>).</li>
+      </ul>
+    </p>
+    <h1 id="section-10">Context, context, context</h1>
+    <p>
+      Lack of continual learning and limited context are fundamental constraints of LLMs today, and I would regularly see small breaks in the model's map of the territory like 
+      💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-13_cursor_rethinking_web_crawler_architect_c4opus.md#if-you-do-choose-redis">advising me to use redis cluster</a> 
+      despite the project docs at the time clearly saying the crawler was single-machine.
+    </p>
+    <p>
+      Enabling the memories feature in Cursor didn't have any noticeable effect on the models' ability to remember things, and I had to continually engage in context engineering. I found a simple approach 
+      worked ok for me: updating project documentation (split into a README.MD with common development workflows and a more detailed architecture file) with AI and always adding it to context.
+    </p>
+    <p>
+      Often when the model made a mistake, it was because I underspecified the prompt and the context didn't contain enough to fill in the gaps. This led to corrections like so:
+    </p>
+    <div style="display: block; background: white; border-left: 3px solid rgba(0, 0, 0, 0.05); padding: 0 0 0 24px; color: rgba(0, 0, 0, 0.7);">
+      <i>
+        <p>
+          I realize I underspecified this task. The crawler is intended to be configured such that each process can always take a core all for itself. That means cores_per_pod should always be equal to 
+          parsers_per_pod + fetchers_per_pod. Additionally, the orchestrator is technically a fetcher (it should be considered the first fetcher). If this is not possible on a given CPU setup for the 
+          current config, then it is up to the crawler user to change the config.
+        </p>
+        <p>
+          So, let's make these changes:
+          <ul class="compact-li">
+            <li>Change the config to reflect that the cores_per_pod is always equal to the total number of processes in the pod (excluding the redis process, as the redis instances are provisioned independently from the crawler system).</li>
+            <li>Change the CPU affinity accordingly</li>
+            <li>Also remove the default args from the CPU affinity function, we never call this function without passing in args?</li>
+          </ul>
+        </p>
+      </i>
+    </div>
+    <h1 id="section-11">Slop is the enemy of performance</h1>
+    <p>
+      Earlier, I mentioned a pernicious problem: logically correct but redundant slop causing performance issues. Some examples to ground the impact:
+      <ul class="compact-li">
+        <li>
+          <p>
+            💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-05-25_cursor_collaborative_web_crawler_projec.md">Gemini wrote the initial versions of the fetcher and parser</a> 
+            in which:
+            <ul class="compact-li">
+              <li>The fetcher didn't filter for text-only content even though that was in the requirements</li>
+              <li>The parser performed a useless "clean HTML" step which slowed it down by 2x</li>
+              <li>The fetcher populated a field <code>content_bytes</code> with the entire raw bytes of the fetched URL. The field was unused, and simply increased the peak memory usage and risk of OOMs</li>
+              <li>
+                The fetcher internally used an <code>aiohttp.HttpClient</code> which was created without passing in the <a href="https://docs.aiohttp.org/en/stable/client_reference.html#aiohttp.DummyCookieJar">DummyCookieJar</a>, 
+                which meant every http request accumulated cookies by default, a hidden memory leak that killed overnight runs of the crawler
+              </li>
+            </ul>
+          </p>
+        </li>
+        <li>
+          <p>
+            Claude also had a habit of adding unnecessary bits, like:
+            <ul class="compact-li">
+              <li>
+                💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-07-01_cursor_optimize_web_crawler_memory_usag_c4opus.md">Many redundant fields in <code>visited:*</code> hashes in redis</a> which resulted in 2x the necessary memory usage
+              </li>
+              <li>Completely unused class attributes, such as a SQL client in a redis-backed frontier class (presumably a copy-paste from an older version of the class)</li>
+              <li>Completely unused fields in a bespoke file format that Claude designed</li>
+            </ul>
+          </p>
+        </li>
+      </ul>
+    </p>
+    <p>
+      After large changes I found myself consistently spending considerable time trimming the fat; this could occasionally be sped up by 💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-18_cursor_reviewing_redis_implementation_f_c4opus.md">asking the model to review its own code</a>.
+    </p>
+    <p>
+      Some of the above issues stem from my use of a dynamic language and imperfect coverage of linters, which I expect will be much improved soon. Others such as the redundant “clean HTML” and unused redis fields are more difficult to avoid.
+    </p>
+    <h1 id="section-12">Conclusion</h1>
+    <p>
+      This post was originally titled “Moving up the stack with AI.” In hindsight that would've been a terrible title. <i>Obviously</i> AI lets us be more ambitious and ship whole apps where we previously 
+      would've had small scripts. But I started this whole thing because as a performance person who's always taken <a href="https://fly.io/blog/youre-all-nuts/#:~:text=the%20same%20argument.-,but%20the%20craft,-Do%20you%20like">pride in the craft</a>, 
+      I wasn't sure what this brave new world would have for me.
+    </p>
+    <p>
+      Now I can confidently say: these coding machines have utterly transformed the scale of the software I can write. I'm now able to write entire systems in greenfield projects and try out dozens of 
+      designs and technologies - on the side! But the fundamentals are more important than ever, because agents are still broken in countless ways big and small. People who can go deep and maintain 
+      understanding over the full stack - they'll be able to navigate the jagged frontier of capability the best.
+    </p>
+    <p>
+      Will this always be the case? I don't know. This technology is extremely powerful and it's getting better every day. What things will be like a month or a year from now is hard to predict. I think
+      <a href="https://crawshaw.io/blog/programming-with-agents">David Crawshaw</a> put things best: it's a time for curiosity and humility.
+    </p>
+  </dt-article>
+
+  <dt-appendix>
+    <h3>Acknowledgements</h3>
+    <p>
+    </p>
+  </dt-appendix>
+
+  <script type="text/bibliography">
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      renderMathInElement(document.body);
+    });
+    const toc = document.getElementById("toc");
+    const sections = document.querySelectorAll(`[id^=section-]`);
+    for (let section of sections) {
+      const h = section.tagName;
+      const title = section.textContent;
+      const id = section.id;
+      const a = document.createElement("a");
+      a.href = `#${id}`;
+      a.textContent = title;
+      const li = document.createElement("li");
+      li.classList.add(`toc-${h}`);
+      for (let i = 0; i < id.length; i++) {
+          if (id[i] === ".") {
+              const tab = document.createElement("span");
+              tab.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+              li.appendChild(tab);
+          }
+      }
+      li.appendChild(a);
+      toc.appendChild(li);
+    }
+  </script>
+</toyb-post>
