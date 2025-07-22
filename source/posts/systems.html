@@ -65,9 +65,9 @@
       </li>
     </ul> -->
     <p>
-      There's been a thousand posts about vibe coding already, from <a href="https://www.indragie.com/blog/i-shipped-a-macos-app-built-entirely-by-claude-code">Indragie Karunaratne</a> shipping the 
-      Context app on the Mac to <a href="https://blog.ezyang.com/2025/06/vibe-coding-case-study-scubaduck/">Edward Yang</a> making ScubaDuck to <a href="https://news.ycombinator.com/item?id=44159166">Cloudflare</a> 
-      building OAuth with Claude. These are all projects where it's something the creator is already an expert in, or a read-only app where bugs are low-impact, or a well-known standard with a small 
+      There's been a thousand posts about vibe coding. Some case studies from <a href="https://www.indragie.com/blog/i-shipped-a-macos-app-built-entirely-by-claude-code">Indragie Karunaratne</a>, 
+      <a href="https://blog.ezyang.com/2025/06/vibe-coding-case-study-scubaduck/">Edward Yang</a>, and <a href="https://news.ycombinator.com/item?id=44159166">Cloudflare</a> 
+      stuck out to me. These are all projects where it's something the creator is already an expert in, or a read-only app where bugs are low-impact, or a well-known standard with a small 
       design space.
     </p>
     <p>
@@ -259,7 +259,7 @@ except:
     <p>
       For my web crawler, this meant I could prototype 8 major designs, an absurd luxury for a side project done in little over a month of mostly nights and weekends:
       <ol class="compact-li">
-        <li>💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-05-25_cursor_collaborative_web_crawler_projec.md">Single-process crawler backed by SQLite-based frontier</a> (unmeasured)</li>
+        <li>💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-05-25_cursor_collaborative_web_crawler_projec.md">Single-process crawler backed by SQLite-based frontier</a> (unmeasured; slow)</li>
         <li>💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-05-31_cursor_designing_a_new_datastore_for_th_claude4opus.md">Single-process backed by PostgreSQL frontier</a> (20 pages/sec)</li>
         <li>💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-13_cursor_rethinking_web_crawler_architect_c4opus.md">Single-process backed by hybrid Redis and filesystem frontier (20 pages/sec)</a></li>
         <li>4x fetchers, 3x parsers backed by hybrid Redis-filesystem frontier (320 pages/sec)</li>
@@ -268,6 +268,9 @@ except:
         <li>Single-node, 12x pod system without cross-communication (1k pages/sec)</li>
         <li>12x node, single-pod system (10.8k pages/sec)</li>
       </ol>
+    </p>
+    <p>
+      That's two orders of magnitude (&lt;20 pages/sec to 10.8k pages/sec) of throughput improvements!
     </p>
     <p>
       I did this without being an expert in the technologies used. Of course, that meant I didn't have the sense to start with a good design; in hindsight, the early designs I tried were really stupid. 
@@ -322,6 +325,10 @@ except:
           wanted and answering the questions that I didn't think to ask.
         </li>
       </ul>
+    </p>
+    <p>
+      I think the jury's still out on this one. I started exerting more control over the design direction after the SQLite misadventure because I didn't want to waste my experiment money or time,
+      but Opus might actually be quite good.
     </p>
     <h2 id="section-7">7. Pair programmer in the machine</h1>
     <p>
