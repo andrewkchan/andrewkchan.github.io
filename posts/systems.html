@@ -189,7 +189,7 @@ Total lines changed: 1253
       See <a href="https://andrewkchan.dev/posts/crawler.html">my other blog post</a> for the exact constraints of my web crawler. The interesting parts were:
       </p><ul class="compact-li">
         <li><b>In a new domain</b>: Most of my experience is in real-time C++ and web applications, developer tooling, or GPU kernels. I hadn't worked in-depth with data-intensive systems nor the datastore technologies I ended up using before.</li>
-        <li><b>Design space is large</b>: I'll talk about all the different designs I tried later in this article.</li>
+        <li><b>Design space is large</b>: See <a href="#section-4">§4: Rapidly exploring the design space</a>.</li>
         <li><b>Long experimental runs</b>: The performance signal during crawler runs was noisy and it took time to reach steady state. Some issues like memory leaks only emerged in overnight runs.</li>
         <li><b>Resource-constrained</b>: Experiments cost money and I don't have that much!</li>
         <li><b>Some bugs are really bad at scale</b>: Not respecting politeness, requesting the same URL twice, etc.</li>
