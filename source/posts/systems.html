@@ -270,7 +270,7 @@ except:
       </ol>
     </p>
     <p>
-      That's two orders of magnitude (&lt;20 to 10.8k pages/sec) of throughput improvements!
+      That's <b>two orders of magnitude</b> (&lt;20 to 10.8k pages/sec) of throughput improvements<dt-fn>Yes, some of it is just scaling. But different designs were needed to scale effectively.</dt-fn>!
     </p>
     <p>
       I did this without being an expert in the technologies used. Of course, that meant I didn't have the sense to start with a good design; in hindsight, the early designs I tried were really stupid. 
@@ -291,7 +291,7 @@ except:
     </p>
     <p>
       In parallel programming, we use the more precise language of <a href="https://jax-ml.github.io/scaling-book/roofline/">“boundedness”</a>: communication and computation happen concurrently, 
-      and even if they can be perfectly overlapped, an operation must wait for (”is bound by”) the longer of the two to finish. 
+      and even if they can be perfectly overlapped, an operation must wait for (is bound by) the longer of the two to finish. 
     </p>
     <p>
       What's going on here is that many tasks in software engineering are moving from being coding-bounded to communication or experiment-bounded, my crawler being a prime example of the latter. Yet the 
@@ -327,8 +327,8 @@ except:
       </ul>
     </p>
     <p>
-      I think the jury's still out on this one. I started exerting more control over the design direction after the SQLite misadventure because I didn't want to waste my experiment money or time,
-      but Opus might actually be quite good.
+      I think the jury's still out on this one. I started exerting more control over the design direction after the SQLite misadventure,
+      but Opus might actually be really good<dt-fn>Caveats: this is a well-studied problem and we were searching over widely used technologies.</dt-fn>.
     </p>
     <h2 id="section-7">7. Pair programmer in the machine</h1>
     <p>
