@@ -110,7 +110,7 @@
     <dt-byline></dt-byline>
     <h2 id="section-1">1. My setup</h2>
     <p>
-      I used Cursor, just the IDE and chat in agent mode. No background agents (which were early preview when I started). Somehow this has become boring: Steve Yegge calls it 
+      I used Cursor, just the IDE in agent mode, mostly with Claude. No background agents (which were early preview when I started). Somehow this has become boring: Steve Yegge calls it 
       <a href="https://sourcegraph.com/blog/revenge-of-the-junior-developer">“chat coding”</a> and says it'll be ancient history by Q3. I stuck with it because:
       </p><ul class="compact-li">
         <li>I'm the type of programmer who doesn't mess with their tools too often, and prefers to instead go deep on the problems I'm solving.</li>
@@ -171,7 +171,7 @@ Total lines changed: 1253
       That's 3.75%!
     </p>
     <p>
-      I started building the crawler as a side project at the very end of May (first with Gemini 2.5 Pro, then Claude 4 Opus), working for a couple hours each night; working through 8 completely 
+      I started building the crawler as a side project at the very end of May (first with Gemini 2.5 Pro, then mostly Claude 4 Opus), working for a couple hours each night; working through 8 completely 
       different designs and running countless experiments took me through the July 4 week, which I took off work to go full-time on this. In retrospect there are totally ways I could've sped 
       this up by parallelizing with background agents or worktrees, but for reasons I'll describe, my problem was ultimately still bottlenecked by code review and experiments: I estimate I 
       could've shaved a week of part-time work off.
@@ -268,7 +268,7 @@ except:
       </ol>
     <p></p>
     <p>
-      This could go sideways in all sorts of ways. I might get mired in tutorials for a new technology. Or if this was at work, other priorities might cutoff (3).
+      This could go sideways in all sorts of ways. I might get mired in tutorials for a new technology. Or if this was at work, other priorities might cut off (3).
     </p>
     <p>
       I think almost everybody does these steps when building performant systems with some tweaks<dt-fn>For example, if you're really smart or your problem is novel enough, you might skip (1). Or maybe 
@@ -426,13 +426,16 @@ except:
     <p></p>
     <h2 id="section-10">10. Context, context, context</h2>
     <p>
-      Lack of continual learning and limited context are fundamental constraints of LLMs today, and I would regularly see small breaks in the model's map of the territory like 
+      Lack of continual learning and limited context are fundamental constraints of LLMs today, and I would sometimes see small breaks in the model's map of the territory like 
       💬 <a href="https://github.com/andrewkchan/crawler-transcripts/blob/main/transcripts/2025-06-13_cursor_rethinking_web_crawler_architect_c4opus.md#if-you-do-choose-redis">advising me to use redis cluster</a> 
       despite the project docs at the time clearly saying the crawler was single-machine.
     </p>
     <p>
-      Enabling the memories feature in Cursor didn't have any noticeable effect on the models' ability to remember things, and I had to continually engage in context engineering. I found a simple approach 
-      worked ok for me: updating project documentation (split into a README.MD with common development workflows and a more detailed architecture file) with AI and always adding it to context.
+      Enabling the memories feature in Cursor didn't have any noticeable effect on the models' ability to remember things, and I had to be thoughtful about the context and prompts. 
+      While much noise has been made recently about "context engineering" superseding "prompt engineering", I found that adding centralized docs and just being very specific in prompting worked well for me,
+      as the newer models (especially Claude) could use <code>grep</code> sufficiently well, and my codebase was fairly small. A simple approach of updating project documentation (split into a README.MD 
+      with common development workflows and a more detailed architecture file) with AI and always adding it (as well as any previous chats if part of an ongoing project) at the top of a chat usually sufficed. 
+      This is despite occasional issues like the above.
     </p>
     <p>
       Often when the model made a mistake, it was because I underspecified the prompt and the context didn't contain enough to fill in the gaps. This led to corrections like so:
@@ -513,7 +516,7 @@ except:
   <dt-appendix>
     <h3>Acknowledgements</h3>
     <p>
-      Thanks to Ryan Kaplan, Sawyer Hood, and Willy Wu for reading and giving feedback.
+      Thanks to Ryan Kaplan, Jonathan Chan, Sawyer Hood, and Willy Wu for reading and giving feedback.
     </p>
   </dt-appendix>
 
