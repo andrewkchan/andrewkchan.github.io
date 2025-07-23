@@ -243,7 +243,7 @@
     <p>
       I went through a few different designs before ending up with the one above. It seems like most recent crawlers<dt-cite key="nielsen2012crawl"></dt-cite><dt-cite key="scrapy"></dt-cite><dt-cite key="frontera"></dt-cite> 
       use a fast in-memory datastore like Redis, and for good reason. I made small-scale prototypes with SQLite and PostgreSQL backends, but making frontier queries fast was overly complex despite the conceptual 
-      simplicity of the data structure. AI coding tools helped with this exploration a lot; I'll write about this in another blog post.
+      simplicity of the data structure. AI coding tools helped with this exploration a lot; I've written about this <a href="https://andrewkchan.dev/posts/systems.html">here</a>.
     </p>
     <p>
       I also tried pretty hard to make vertically scaling a single node work; I was optimistic about this because so many of the hardware bottlenecks that had 
