@@ -5306,7 +5306,7 @@ var meta = function(dom, data) {
       { appendHead(("    <meta name=\"" + name + "\" content=\"" + (index$1(content)) + "\" >\n")); }
   }
 
-  appendHead(("\n    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=Edge,chrome=1\">\n    <link href=\"/rss.xml\" rel=\"alternate\" type=\"application/rss+xml\" title=\"Blog Posts from andrewkchan.dev\">\n    <link rel=\"canonical\" href=\"" + (data.url) + "\">\n    <title>" + (data.title) + "</title>\n  "));
+  appendHead(("\n    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=Edge,chrome=1\">\n    <link href=\"/rss.xml\" rel=\"alternate\" type=\"application/rss+xml\" title=\"Blog Posts from andrewkchan.dev\">\n    <title>" + (data.title) + "</title>\n  "));
 
   appendHead(("\n    <!--  https://schema.org/Article -->\n    <meta property=\"article:published\" itemprop=\"datePublished\" content=\"" + (data.publishedYear) + "-" + (data.publishedMonthPadded) + "-" + (data.publishedDayPadded) + "\" />\n    <meta property=\"article:created\" itemprop=\"dateCreated\" content=\"" + (data.publishedDate) + "\" />\n    <meta property=\"article:modified\" itemprop=\"dateModified\" content=\"" + (data.updatedDate) + "\" />\n  "));
   data.authors.forEach(function (a) {
