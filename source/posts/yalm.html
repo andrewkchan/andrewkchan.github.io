@@ -89,6 +89,9 @@
       #toc > li {
           list-style-type: none;
       }
+      .toc-anchor {
+        font-style: italic;
+      }
       .l-gutter {
           position: relative;
           background-color: white;
@@ -1474,25 +1477,35 @@ print(f"Generation stats:\n" +
       renderMathInElement(document.body);
     });
     const toc = document.getElementById("toc");
-    const sections = document.querySelectorAll(`[id^=section-]`);
-    for (let section of sections) {
-      const h = section.tagName;
-      const title = section.textContent;
-      const id = section.id;
+    const addItemToTOC = (h, title, id, indentLevel) => {
       const a = document.createElement("a");
       a.href = `#${id}`;
       a.textContent = title;
       const li = document.createElement("li");
       li.classList.add(`toc-${h}`);
-      for (let i = 0; i < id.length; i++) {
-          if (id[i] === ".") {
-              const tab = document.createElement("span");
-              tab.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
-              li.appendChild(tab);
-          }
+      for (let i = 0; i < indentLevel; i++) {
+        const tab = document.createElement("span");
+        tab.innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+        li.appendChild(tab);
       }
       li.appendChild(a);
       toc.appendChild(li);
     }
+    addItemToTOC("anchor", "(Top)", "", 0);
+    // Add `<li><a href="#section-...">{sectionTitle}</a></li>` to TOC for all sections
+    const sections = document.querySelectorAll(`[id^=section-]`);
+    for (let section of sections) {
+      const h = section.tagName;
+      const title = section.textContent;
+      const id = section.id;
+      let indentLevel = 0;
+      for (let i = 0; i < id.length; i++) {
+          if (id[i] === ".") {
+              indentLevel++;
+          }
+      }
+      addItemToTOC(h, title, id, indentLevel);
+    }
+    addItemToTOC("anchor", "(Comments)", "bottom", 0);
   </script>
 </toyb-post>
