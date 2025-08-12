@@ -1,7 +1,7 @@
 {
   "dependencies": {
     "dics": "^2.6.1",
-    "toy-blog-engine": "^0.0.3"
+    "toy-blog-engine": "file:./toy-blog"
   },
   "scripts": {
     "build": "npm exec toyb -- --index-template ./index.html --post-template ./post.html --posts ./posts --output .."
