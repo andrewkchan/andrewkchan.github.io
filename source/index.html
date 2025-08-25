@@ -36,11 +36,22 @@
     .toyb-nav li {
       list-style-type: none;
       margin-left: 0;
+      display: grid;
+      grid-template-columns: 95px auto;
+    }
+    @media (min-width: 1024px) {
+      .toyb-nav li {
+        grid-template-columns: 120px auto;
+      }
     }
     .toyb-nav-li-date {
       color: #555;
       font-size: 0.9em;
       margin-right: 0.5em;
+      grid-column-start: 1;
+    }
+    .toyb-nav-li-link {
+      grid-column-start: 2;
     }
   </style>
 </head>
