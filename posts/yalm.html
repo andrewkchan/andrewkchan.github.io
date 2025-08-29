@@ -1322,7 +1322,7 @@ half2 v01_2; float att_2;
 /* ... SNIP ... */
 half2 v01_15; float att_15;
 int t = warp_id;
-for (int ctr = 0; ctr &lt; seq_len / t_stride; t += t_stride, ctr++) {
+for (int ctr = 0; ctr &lt; seq_len / t_stride - UNROLL + 1; t += t_stride, ctr++) {
   int ctr_mod = ctr % UNROLL;
   if (ctr_mod == 0) {
     // prefetch every UNROLL iterations
