@@ -4,6 +4,6 @@
     "toy-blog-engine": "file:./toy-blog"
   },
   "scripts": {
-    "build": "npm exec toyb -- --index-template ./index.html --post-template ./post.html --posts ./posts --output .."
+    "build": "npm exec toyb -- --index-template ./index.html --post-template ./post.html --posts ./posts --output .. && node gen-feed.js"
   }
 }
